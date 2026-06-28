@@ -13,5 +13,6 @@ int main() {
     board.loadFEN(italianFEN);
     board.display();
     cout << "FEN: " << board.toFEN() << "\n";
+    
     return 0;
 }

@@ -5,6 +5,11 @@
 
 #include "piece.h"
 #include "move.h"
+struct Undo {
+    int castlingRights;
+    int enPassantSquare;
+};
+
 
 class Board {
 public:
@@ -26,18 +31,23 @@ public:
 
     // Move generation
     std::vector<Move> generateMoves();
-
+    void makeMove(const Move&);
+    void unmakeMove();
 private:
+    
     // Board representation
     std::vector<int> squares;
     int sideToMove;
-
+    int enpassentSquare=-1;
+    int castlingRights=15;
+    int prevcastlingRights=15;
     // Precomputed attacks
     std::vector<int> knightAttacks[64];
     std::vector<int> kingAttacks[64];
-
+    std::vector<Undo> history;
     std::vector<int> rookRays[64][4];
     std::vector<int> bishopRays[64][4];
+    std::vector<Move> moveHistory;
 
     static const std::string startFEN;
 
@@ -57,7 +67,6 @@ private:
     void generateSlidingPieces(int sq, std::vector<Move>& moves);
 
     // Sliding helper
-    void generateRays(const std::vector<int>& ray,
-                      int sq,
-                      std::vector<Move>& moves);
+    void generateRays(const std::vector<int>& ray,int sq,std::vector<Move>& moves);
+
 };

@@ -1,7 +1,43 @@
 #include "board.h"
+#include "move.h"
+#include "piece.h"
 #include<vector>
+#include<iostream>
+constexpr int WHITE_KINGSIDE  = 1 << 0;
+constexpr int WHITE_QUEENSIDE = 1 << 1;
+constexpr int BLACK_KINGSIDE  = 1 << 2;
+constexpr int BLACK_QUEENSIDE = 1 << 3;
 using namespace std;
-
+int charToPiece(char c) {
+    switch(tolower(c)) {
+        case 'k': return Piece::King;
+        case 'r': return Piece::Rook;
+        case 'p': return Piece::Pawn;
+        case 'q': return Piece::Queen;
+        case 'n': return Piece::Knight;
+        case 'b': return Piece::Bishop;
+        default:  return Piece::None;
+    }
+}
+int opposite(int a){
+    if((a & Piece::ColorMask)==Piece::White){
+        return Piece::Black;
+    }else{
+        return Piece::White;
+    }
+}
+char pieceToChar(int piece) {
+    int type = piece & Piece::TypeMask;
+    switch(type) {
+        case Piece::King:   return 'k';
+        case Piece::Rook:   return 'r';
+        case Piece::Pawn:   return 'p';
+        case Piece::Queen:  return 'q';
+        case Piece::Knight: return 'n';
+        case Piece::Bishop: return 'b';
+        default:            return '.';
+    }
+}
     bool Board::isopponent(int a,int b){
         if (b == Piece::None)
             return false;
@@ -423,5 +459,274 @@ using namespace std;
             for(auto &rays:bishopRays[sq]){
                 generateRays(rays,sq,moves);
             }
+        }
+    }
+    Board::Board() : squares(64, Piece::None){
+        precomputeBishopRays();
+        precomputeRookRays();
+        precomputeKing();
+        precomputeknight();
+        loadFEN(startFEN);
+    }
+    int Board::getPiece(int rank, int file) const {
+        return squares[rank * 8 + file];
+    }
+    
+    void Board::setPiece(int rank, int file, int piece) {
+        squares[rank * 8 + file] = piece;
+    }
+    
+    int Board::getPiece(int index) const {
+        return squares[index];
+    }
+    
+    void Board::setPiece(int index, int piece) {
+        squares[index] = piece;
+    }
+    void Board::loadFEN(const string& fen) {
+        squares.assign(64, Piece::None);
+        
+        int rank = 7, file = 0;
+        
+        for (char c : fen) {
+            if (c == '/') {
+                file = 0;
+                rank--;
+            }
+            else if (isdigit(c)) {
+                file += (c - '0');
+            }
+            else {
+                int color = isupper(c) ? Piece::White : Piece::Black;
+                int pieceType = charToPiece(c);
+                setPiece(rank, file, color | pieceType);
+                file++;
+            }
+        }
+    }
+    void Board::display() const {
+        cout << "\n  a b c d e f g h\n";
+        
+        for (int rank = 7; rank >= 0; rank--) {
+            cout << rank + 1 << " ";
+            
+            for (int file = 0; file < 8; file++) {
+                int piece = getPiece(rank, file);
+                
+                if (piece == Piece::None) {
+                    cout << ". ";
+                } else {
+                    char p = pieceToChar(piece);
+                    if (piece & Piece::White) {
+                        p = toupper(p);
+                    }
+                    cout << p << " ";
+                }
+            }
+            cout << rank + 1 << "\n";
+        }
+        
+        cout << "  a b c d e f g h\n\n";
+    }
+    string Board::toFEN() const {
+        string fen = "";
+        
+        for (int rank = 7; rank >= 0; rank--) {
+            int emptyCount = 0;
+            
+            for (int file = 0; file < 8; file++) {
+                int piece = getPiece(rank, file);
+                
+                if (piece == Piece::None) {
+                    emptyCount++;
+                } else {
+                    if (emptyCount > 0) {
+                        fen += to_string(emptyCount);
+                        emptyCount = 0;
+                    }
+                    
+                    char p = pieceToChar(piece);
+                    if (piece & Piece::White) {
+                        p = toupper(p);
+                    }
+                    fen += p;
+                }
+            }
+            
+            if (emptyCount > 0) {
+                fen += to_string(emptyCount);
+            }
+            
+            if (rank > 0) fen += '/';
+        }
+        
+        return fen;
+    }
+    vector<Move> Board::generateMoves(){
+        vector<Move> moves;
+        for(int sq=0;sq<64;sq++){
+            int piece = squares[sq];
+
+            if (!piece)
+                continue;
+
+            if ((piece & Piece::ColorMask) != sideToMove)
+                continue;
+
+            switch (piece & Piece::TypeMask) {
+                case Piece::Pawn:
+                    generatePawnMoves(sq, moves);
+                    break;
+
+                case Piece::Knight:
+                    generateKnightMoves(sq, moves);
+                    break;
+
+                case Piece::Bishop:
+                case Piece::Rook:
+                case Piece::Queen:
+                    generateSlidingPieces(sq, moves);
+                    break;
+
+                case Piece::King:
+                    generateKingMoves(sq, moves);
+                    break;
+            }
+        }
+        return moves;
+    }
+    void Board::makeMove(const Move& m){
+        moveHistory.push_back(m);
+        history.push_back({castlingRights,enpassentSquare});
+        bool isblack=(sideToMove & Piece::ColorMask)==Piece::Black;
+        if ((m.capturedpiece & Piece::TypeMask) == Piece::Rook) {
+            switch (m.to) {
+                case 0:   // a1
+                    castlingRights &= ~(WHITE_QUEENSIDE);
+                    break;
+
+                case 7:   // h1
+                    castlingRights &= ~(WHITE_KINGSIDE);
+                    break;
+
+                case 56:  // a8
+                    castlingRights &= ~(BLACK_QUEENSIDE);
+                    break;
+
+                case 63:  // h8
+                    castlingRights &= ~(BLACK_KINGSIDE);
+                    break;
+
+            }
+        }
+        if((m.movedpiece & Piece::TypeMask)==Piece::King){
+            if(isblack){
+                castlingRights &= ~(BLACK_KINGSIDE | BLACK_QUEENSIDE);
+            }
+            else{
+                castlingRights &= ~(WHITE_KINGSIDE | WHITE_QUEENSIDE);;
+            }
+        }else if((m.movedpiece & Piece::TypeMask)==Piece::Rook){
+            switch (m.from) {
+                case 0:   // a1
+                    castlingRights &= ~(WHITE_QUEENSIDE);
+                    break;
+
+                case 7:   // h1
+                    castlingRights &= ~(WHITE_KINGSIDE);
+                    break;
+
+                case 56:  // a8
+                    castlingRights &= ~(BLACK_QUEENSIDE);
+                    break;
+
+                case 63:  // h8
+                    castlingRights &= ~(BLACK_KINGSIDE);
+                    break;
+            }
+        }
+        enpassentSquare=-1;
+        squares[m.to]=m.movedpiece;
+        squares[m.from]=Piece::None;
+        if(m.promotion!=NONE){
+            squares[m.to]=(sideToMove & Piece::ColorMask) |m.promotion;
+        }
+        if (m.isEnPassant) {
+            if (sideToMove == Piece::White)
+                squares[m.to - 8] = Piece::None;
+            else
+                squares[m.to + 8] = Piece::None;
+        }
+        if(m.isDoublePawnPush){
+            
+            if(isblack){
+                enpassentSquare=m.to+8;
+            }else{
+                enpassentSquare=m.to-8;
+            }
+        }
+        if(m.isCastle){
+            int toFile=m.to%8;
+            if(toFile==6){
+                if(isblack){
+                    squares[63]=Piece::None;
+                    squares[61]=Piece::Black | Piece::Rook;
+                }
+                else{
+                    squares[7]=Piece::None;
+                    squares[5]=Piece::White | Piece::Rook;
+                }
+            }else{
+                if(isblack){
+                    squares[56]=Piece::None;
+                    squares[59]=Piece::Black | Piece::Rook;
+                }
+                else{
+                    squares[0]=Piece::None;
+                    squares[3]=Piece::White | Piece::Rook;
+                }
+            }
+        }
+        sideToMove=opposite(sideToMove);
+        
+    }
+    void Board::unmakeMove(){
+        Move prev=moveHistory.back();
+        moveHistory.pop_back();
+        castlingRights=history.back().castlingRights;
+        enpassentSquare=history.back().enPassantSquare;
+        sideToMove=opposite(sideToMove);
+        bool isBlack= sideToMove==Piece::Black;
+        history.pop_back();
+        squares[prev.from]=prev.movedpiece;
+        if(!prev.isEnPassant) squares[prev.to]=prev.capturedpiece;
+        if(prev.isCastle){
+            int castleFile=prev.to%8;
+            if(castleFile==6){
+                if(isBlack){
+                    squares[63]=Piece::Black | Piece::Rook;
+                    squares[61]=Piece::None;
+                }
+                else{
+                    squares[7]=Piece::White | Piece::Rook;
+                    squares[5]=Piece::None;
+                }
+            }else{
+                if(isBlack){
+                    squares[56]=Piece::Black | Piece::Rook;
+                    squares[59]=Piece::None;
+                }
+                else{
+                    squares[0]=Piece::White | Piece::Rook;
+                    squares[3]=Piece::None;
+                }
+            }
+        }
+        if(prev.isEnPassant){
+            squares[prev.to] = Piece::None;
+            if (!isBlack)
+                squares[prev.to - 8] = prev.capturedpiece;
+            else
+                squares[prev.to + 8] = prev.capturedpiece;
         }
     }
