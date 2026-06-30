@@ -41,6 +41,8 @@ private:
     int enpassentSquare=-1;
     int castlingRights=15;
     int prevcastlingRights=15;
+    int whiteKingSquare;
+    int blackKingSquare;
     // Precomputed attacks
     std::vector<int> knightAttacks[64];
     std::vector<int> kingAttacks[64];
@@ -69,4 +71,9 @@ private:
     // Sliding helper
     void generateRays(const std::vector<int>& ray,int sq,std::vector<Move>& moves);
 
+    //attack squares
+    bool isSquareAttacked(int sq,int opponentColor);
+
+    //check if in check
+    bool isInCheck(int MovedColor);
 };

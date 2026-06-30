@@ -620,6 +620,10 @@ char pieceToChar(int piece) {
             }
         }
         if((m.movedpiece & Piece::TypeMask)==Piece::King){
+            if (sideToMove == Piece::White)
+                whiteKingSquare = m.to;
+            else
+                blackKingSquare = m.to;
             if(isblack){
                 castlingRights &= ~(BLACK_KINGSIDE | BLACK_QUEENSIDE);
             }
@@ -729,4 +733,50 @@ char pieceToChar(int piece) {
             else
                 squares[prev.to + 8] = prev.capturedpiece;
         }
+        if ((prev.movedpiece & Piece::TypeMask) == Piece::King) {
+            if (sideToMove == Piece::White)
+                whiteKingSquare = prev.from;
+            else
+                blackKingSquare = prev.from;
+        }
+    }
+    bool Board::isSquareAttacked(int sq,int opponentColor){
+        //check rook or queen
+        for(auto &ray:rookRays[sq]){
+            for(int to:ray){
+                if(!squares[to]) continue;
+                if(squares[to]==(opponentColor | Piece::Rook) || squares[to]==(opponentColor | Piece::Queen)) return true;
+                break;
+            }
+        }
+        for(auto &ray:bishopRays[sq]){
+            for(int to:ray){
+                if(!squares[to]) continue;
+                if(squares[to]==(opponentColor | Piece::Bishop) || squares[to]==(opponentColor | Piece::Queen)) return true;
+                break;
+            }
+        }
+        for(int to:knightAttacks[sq]){
+            if(squares[to]==(opponentColor | Piece::Knight)) return true;
+        }
+        if(opponentColor==Piece::White){
+            if(sq%8<7 && sq>9)
+                if(squares[sq-9]==(opponentColor | Piece::Pawn)) return true;
+            if(sq%8>0 && sq>7)
+                if( squares[sq-7]==(opponentColor | Piece::Pawn)) return true;
+        }
+        if(opponentColor==Piece::Black){
+            if(sq%8<7 && sq+9<64)
+                if(squares[sq+9]==(opponentColor | Piece::Pawn)) return true;
+            if(sq%8>0 && sq+7<64)
+                if( squares[sq+7]==(opponentColor | Piece::Pawn)) return true;
+        }
+        for(int to:kingAttacks[sq]){
+            if(squares[to]==(opponentColor | Piece::King)) return true;
+        }
+        return false;
+    }
+    bool Board::isInCheck(int movedColor){
+        if(movedColor==Piece::White) return (isSquareAttacked(whiteKingSquare, opposite(movedColor)));
+        return isSquareAttacked(blackKingSquare, opposite(movedColor));
     }
