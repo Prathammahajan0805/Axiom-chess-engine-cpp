@@ -1,6 +1,7 @@
 #include "board.h"
 #include "move.h"
 #include "piece.h"
+#include <cctype>
 #include<vector>
 #include<iostream>
 constexpr int WHITE_KINGSIDE  = 1 << 0;
@@ -98,7 +99,7 @@ char pieceToChar(int piece) {
             int currfile=sq%8;
             int currrank=sq/8;
             //right(east) horizontal
-            for(int i=sq+1;i<currrank*16;i++){
+            for(int i=sq+1;i<currrank*8+8;i++){
                 rookRays[sq][2].push_back(i);
             }
             //left(west) horizontal
@@ -111,7 +112,7 @@ char pieceToChar(int piece) {
             }
             //down(south) vertical
             for(int i=sq-8;i>=0;i-=8){
-                rookRays[sq][0].push_back(i);
+                rookRays[sq][1].push_back(i);
             }
         }
     }
@@ -141,132 +142,420 @@ char pieceToChar(int piece) {
             }
         }
     }
+    bool Board::isSquareBlockingCheck(int sq){
+        for(auto checks:Checkers){
+            for(auto i:checks.blockSquares){
+                if(i==sq) return true;
+            }
+        }
+        return false;
+    }
+    bool Board::isCheckersSquare(int sq){
+
+        for(auto check:Checkers){
+            if(check.attackerSq==sq) return true;
+        }
+
+        return false;
+    }
+    bool Board::isPiecePinned(int sq){
+        for(auto pin:Pins){
+            if(pin.pinned_piece==sq) return true;
+        }
+        return false;
+    }
     void Board::generatePawnMoves(int sq,vector<Move>& moves){
         bool iswhite=(Piece::ColorMask & squares[sq])==Piece::White;
         int file=sq%8;
         static constexpr Promotion promos[] = {QUEEN, ROOK, BISHOP, KNIGHT};
+        if(numCheckers==0 && !isPiecePinned(sq)){
         //normally
-        if(iswhite && sq<48 ){
+            if(iswhite && sq<48 ){
 
-            // just a single pawn push
-            if(!squares[sq+8]){
-                moves.push_back({sq,
-                    sq+8,
+                // just a single pawn push
+                if(!squares[sq+8]){
+                    moves.push_back({sq,
+                        sq+8,
+                        squares[sq],
+                        Piece::None,
+                        NONE,
+                        false,
+                        false,
+                        false});
+                
+                //check if we can do double
+                    if(sq>=8 && sq<16 && !squares[sq+16]){
+                        //double pawn move
+                        moves.push_back({sq,
+                        sq+16,
+                        squares[sq],
+                        Piece::None,
+                        NONE,
+                        false,
+                        false,
+                        true});
+                    }
+                }
+                //left file
+                if(file>0){
+                    //left capture
+                    if(isopponent(squares[sq], squares[sq+7])){
+                            moves.push_back({
+                            sq,
+                            sq+7,
+                            squares[sq],
+                            squares[sq+7],
+                            NONE,
+                            false,
+                            false,
+                            false
+                        });
+                    }
+                }
+                //right file
+                if(file<7){
+                    //right capture
+                    if(isopponent(squares[sq], squares[sq+9])){
+                            moves.push_back({
+                            sq,
+                            sq+9,
+                            squares[sq],
+                            squares[sq+9],
+                            NONE,
+                            false,
+                            false,
+                            false
+                        });
+                    }
+                }
+                //check for enpassent right
+                if(sq+9==enpassentSquare){
+                    moves.push_back({
+                        sq,
+                        sq+9,
+                        squares[sq],
+                        squares[sq+1],
+                        NONE,
+                        false,
+                        true,
+                        false
+                    });
+                }
+                //check for enpassanst left
+                if(sq+7==enpassentSquare){
+                    moves.push_back({
+                        sq,
+                        sq+7,
+                        squares[sq],
+                        squares[sq+1],
+                        NONE,
+                        false,
+                        true,
+                        false
+                    });
+                }
+            }
+            else if(iswhite && sq>=48 && sq<56){
+                if(!squares[sq+8]){
+                    for(auto p:promos)
+                        moves.push_back({sq,
+                            sq+8,
+                            squares[sq],
+                            Piece::None,
+                            p,
+                            false,
+                            false,
+                            false});
+                }
+                //check opponent capture moves first file
+                if(file>0 ){
+                    //left capture
+                    if(isopponent(squares[sq], squares[sq+7])){
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq+7,
+                                squares[sq],
+                                squares[sq+7],
+                                p,
+                                false,
+                                false,
+                                false});
+                    }
+                }
+                if(file<7){
+                    //right capture
+                    if(isopponent(squares[sq], squares[sq+9])){
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq+9,
+                                squares[sq],
+                                squares[sq+9],
+                                p,
+                                false,
+                                false,
+                                false});
+                    }
+                        
+                }
+                
+                
+            }
+            //normally
+            if(!iswhite && sq>=16){
+
+                // just a single pawn push
+                if( !squares[sq-8]){
+                    moves.push_back({sq,
+                    sq-8,
                     squares[sq],
                     Piece::None,
                     NONE,
                     false,
                     false,
                     false});
-            
-            //check if we can do double
-                if(sq>=8 && sq<16 && !squares[sq+16]){
-                    //double pawn move
+                
+                //check if we can do double
+                    if(sq>=48 && sq<56 && !squares[sq-16]){
+                        //double pawn move
+                        moves.push_back({sq,
+                        sq-16,
+                        squares[sq],
+                        Piece::None,
+                        NONE,
+                        false,
+                        false,
+                        true});
+                    }
+                }
+
+
+                if(file>0){
+                    //left capture
+                    if(isopponent(squares[sq], squares[sq-9])){
+                            moves.push_back({
+                            sq,
+                            sq-9,
+                            squares[sq],
+                            squares[sq-9],
+                            NONE,
+                            false,
+                            false,
+                            false
+                        });
+                    }
+                }
+                if(file<7){
+                    //right capture
+                    if(isopponent(squares[sq], squares[sq-7])){
+                            moves.push_back({
+                            sq,
+                            sq-7,
+                            squares[sq],
+                            squares[sq-7],
+                            NONE,
+                            false,
+                            false,
+                            false
+                        });
+                    }
+                }
+                if(sq-7==enpassentSquare){
+                    moves.push_back({
+                        sq,
+                        sq-7,
+                        squares[sq],
+                        squares[sq+1],
+                        NONE,
+                        false,
+                        true,
+                        false
+                    });
+                }
+                //check for enpassanst left
+                if(sq-9==enpassentSquare){
+                    moves.push_back({
+                        sq,
+                        sq-9,
+                        squares[sq],
+                        squares[sq-1],
+                        NONE,
+                        false,
+                        true,
+                        false
+                    });
+                }
+            }
+            else if(!iswhite && sq>=8 && sq<=15){
+                if(!squares[sq-8])
+                    for(auto p:promos)
+                        moves.push_back({sq,
+                            sq-8,
+                            squares[sq],
+                            Piece::None,
+                            p,
+                            false,
+                            false,
+                            false});
+                
+                if(file>0){
+                    //left capture
+                    if(isopponent(squares[sq], squares[sq-9])){
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq-9,
+                                squares[sq],
+                                squares[sq-9],
+                                p,
+                                false,
+                                false,
+                                false});
+                    }
+                }
+                if(file<7){
+                    //right capture
+                    if(isopponent(squares[sq], squares[sq-7])){
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq-7,
+                                squares[sq],
+                                squares[sq-7],
+                                p,
+                                false,
+                                false,
+                                false});
+                    }
+                        
+                }
+                
+                
+            }
+        }
+        //-----------------------------------------------------------------------------------------------
+        // context:: REMAINING calculate movemnts if pinned , calculate movements if pinned and in check
+        //-----------------------------------------------------------------------------------------------
+        else if(numCheckers && !isPiecePinned(sq)){
+            if(!iswhite && sq<48){
+                //no promotions nothing crazy
+                if(!squares[sq]){
+                if(isSquareBlockingCheck(sq+8)){
+                    moves.push_back({
+                        sq,
+                        sq+8,
+                        squares[sq],
+                        Piece::None,
+                        NONE,
+                        false,
+                        false,
+                        false
+                    });
+                }
+                //double pawn push
+                if(sq>7 && sq<16 && !squares[sq+16]){
+                    if(isSquareBlockingCheck(sq+16)){
+                        moves.push_back({
+                            sq,
+                            sq+16,
+                            squares[sq],
+                            Piece::None,
+                            NONE,
+                            false,
+                            false,
+                            true
+                        });
+                    }
+                }
+                if(file>0){
+                    if(isCheckersSquare(sq+7)){
+                        moves.push_back({
+                            sq,
+                            sq+7,
+                            squares[sq],
+                            squares[sq+7],
+                            NONE,
+                            false,
+                            false,
+                            true
+                        });
+                    }
+                }
+                if(file<7){
+                    if(isCheckersSquare(sq+9)){
+                        moves.push_back({
+                            sq,
+                            sq+9,
+                            squares[sq],
+                            squares[sq+9],
+                            NONE,
+                            false,
+                            false,
+                            true
+                        });
+                    }
+                }
+            }
+            }else if(iswhite && sq>=48 && sq<56){
+                if(!squares[sq+8]){
+                    if(isSquareBlockingCheck(sq+8))
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq+8,
+                                squares[sq],
+                                Piece::None,
+                                p,
+                                false,
+                                false,
+                                false});
+                }
+                //check opponent capture moves first file
+                if(file>0 ){
+                    //left capture
+                    if(isopponent(squares[sq], squares[sq+7])){
+                        if(isCheckersSquare(sq+7))
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq+7,
+                                squares[sq],
+                                squares[sq+7],
+                                p,
+                                false,
+                                false,
+                                false});
+                    }
+                }
+                if(file<7){
+                    //right capture
+                    if(isopponent(squares[sq], squares[sq+9])){
+                        if(isCheckersSquare(sq+9))
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq+9,
+                                squares[sq],
+                                squares[sq+9],
+                                p,
+                                false,
+                                false,
+                                false});
+                    }
+                        
+                }
+            }
+            if(!iswhite && sq>=16){
+                // just a single pawn push
+                if( !squares[sq-8]){
+                    if(isSquareBlockingCheck(sq-8))
                     moves.push_back({sq,
-                    sq+16,
+                    sq-8,
                     squares[sq],
                     Piece::None,
                     NONE,
                     false,
                     false,
-                    true});
-                }
-            }
-            //left file
-            if(file>0){
-                //left capture
-                if(isopponent(squares[sq], squares[sq+7])){
-                        moves.push_back({
-                        sq,
-                        sq+7,
-                        squares[sq],
-                        squares[sq+7],
-                        NONE,
-                        false,
-                        false,
-                        false
-                    });
-                }
-            }
-            //right file
-            if(file<7){
-                //right capture
-                if(isopponent(squares[sq], squares[sq+9])){
-                        moves.push_back({
-                        sq,
-                        sq+9,
-                        squares[sq],
-                        squares[sq+9],
-                        NONE,
-                        false,
-                        false,
-                        false
-                    });
-                }
-            }
-        }
-        else if(iswhite && sq>=48 && sq<56){
-            if(!squares[sq+8]){
-                for(auto p:promos)
-                    moves.push_back({sq,
-                        sq+8,
-                        squares[sq],
-                        Piece::None,
-                        p,
-                        false,
-                        false,
-                        false});
-            }
-            //check opponent capture moves first file
-            if(file>0 ){
-                //left capture
-                if(isopponent(squares[sq], squares[sq+7])){
-                    for(auto p:promos)
-                        moves.push_back({sq,
-                            sq+7,
-                            squares[sq],
-                            squares[sq+7],
-                            p,
-                            false,
-                            false,
-                            false});
-                }
-            }
-            if(file<7){
-                //right capture
-                if(isopponent(squares[sq], squares[sq+9])){
-                    for(auto p:promos)
-                        moves.push_back({sq,
-                            sq+9,
-                            squares[sq],
-                            squares[sq+9],
-                            p,
-                            false,
-                            false,
-                            false});
-                }
-                    
-            }
-            
-            
-        }
-        //normally
-        if(!iswhite && sq>=16){
-
-            // just a single pawn push
-            if( !squares[sq-8]){
-                moves.push_back({sq,
-                sq-8,
-                squares[sq],
-                Piece::None,
-                NONE,
-                false,
-                false,
-                false});
-            
-            //check if we can do double
+                    false});
+                
+                //check if we can do double
                 if(sq>=48 && sq<56 && !squares[sq-16]){
                     //double pawn move
+                    if(isSquareBlockingCheck(sq-16))
                     moves.push_back({sq,
                     sq-16,
                     squares[sq],
@@ -276,85 +565,88 @@ char pieceToChar(int piece) {
                     false,
                     true});
                 }
-            }
+                }
 
 
-            if(file>0){
-                //left capture
-                if(isopponent(squares[sq], squares[sq-9])){
-                        moves.push_back({
-                        sq,
-                        sq-9,
-                        squares[sq],
-                        squares[sq-9],
-                        NONE,
-                        false,
-                        false,
-                        false
-                    });
-                }
-            }
-            if(file<7){
-                //right capture
-                if(isopponent(squares[sq], squares[sq-7])){
-                        moves.push_back({
-                        sq,
-                        sq-7,
-                        squares[sq],
-                        squares[sq-7],
-                        NONE,
-                        false,
-                        false,
-                        false
-                    });
-                }
-            }
-        }
-        else if(!iswhite && sq>=8 && sq<=15){
-            if(!squares[sq-8])
-                for(auto p:promos)
-                    moves.push_back({sq,
-                        sq-8,
-                        squares[sq],
-                        Piece::None,
-                        p,
-                        false,
-                        false,
-                        false});
-            
-            if(file>0){
-                //left capture
-                if(isopponent(squares[sq], squares[sq-9])){
-                    for(auto p:promos)
-                        moves.push_back({sq,
+                if(file>0){
+                    //left capture
+                    if(isopponent(squares[sq], squares[sq-9]) && isCheckersSquare(sq-9)){
+                            moves.push_back({
+                            sq,
                             sq-9,
                             squares[sq],
                             squares[sq-9],
-                            p,
+                            NONE,
                             false,
                             false,
-                            false});
+                            false
+                        });
+                    }
                 }
-            }
-            if(file<7){
-                //right capture
-                if(isopponent(squares[sq], squares[sq-7])){
-                    for(auto p:promos)
-                        moves.push_back({sq,
+                if(file<7){
+                    //right capture
+                    if(isopponent(squares[sq], squares[sq-7]) && isCheckersSquare(sq-7)){
+                            moves.push_back({
+                            sq,
                             sq-7,
                             squares[sq],
                             squares[sq-7],
+                            NONE,
+                            false,
+                            false,
+                            false
+                        });
+                    }
+                }
+            }
+            else if(!iswhite && sq>=8 && sq<=15){
+                if(!squares[sq-8])
+                    if(isSquareBlockingCheck(sq-8))
+                    for(auto p:promos)
+                        moves.push_back({sq,
+                            sq-8,
+                            squares[sq],
+                            Piece::None,
                             p,
                             false,
                             false,
                             false});
+                
+                if(file>0){
+                    //left capture
+                    if(isopponent(squares[sq], squares[sq-9])){
+                        if(isSquareBlockingCheck(sq-9) || isCheckersSquare(sq-7))
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq-9,
+                                squares[sq],
+                                squares[sq-9],
+                                p,
+                                false,
+                                false,
+                                false});
+                    }
                 }
-                    
+                if(file<7){
+                    //right capture
+                    if(isopponent(squares[sq], squares[sq-7])){
+                        if(isSquareBlockingCheck(sq-7) || isCheckersSquare(sq-7))
+                        for(auto p:promos)
+                            moves.push_back({sq,
+                                sq-7,
+                                squares[sq],
+                                squares[sq-7],
+                                p,
+                                false,
+                                false,
+                                false});
+                    }
+                        
+                }
+                
+                
             }
-            
-            
         }
-        
     }
     void Board::generateKnightMoves(int sq,vector<Move>& moves){
         for (int to : knightAttacks[sq]) {
@@ -414,6 +706,71 @@ char pieceToChar(int piece) {
                     false
 
                 });
+            }
+        }
+        if((squares[sq] &Piece::ColorMask)==Piece::Black){
+            if(castlingRights & BLACK_KINGSIDE && !squares[62] && !squares[61] && !isSquareAttacked(61, Piece::White) && !isSquareAttacked(62, Piece::White)){
+                moves.push_back({
+                    sq,
+                    sq+2,
+                    squares[sq],
+                    Piece::None,
+                    NONE,
+                    true,
+                    false,
+                    false
+
+                });
+            }
+            if(castlingRights & BLACK_QUEENSIDE && !squares[57] && !squares[58] && !squares[59] && 
+                    !isSquareAttacked(57, Piece::White) && 
+                    !isSquareAttacked(58, Piece::White) && 
+                    !isSquareAttacked(59, Piece::White) ){
+                moves.push_back({
+                    sq,
+                    sq-2,
+                    squares[sq],
+                    Piece::None,
+                    NONE,
+                    true,
+                    false,
+                    false
+
+                });
+            }
+        }
+        else{
+            if(castlingRights & WHITE_KINGSIDE && !squares[5] && !squares[6] &&
+                 !isSquareAttacked(6, Piece::Black) && 
+                 !isSquareAttacked(5, Piece::Black)){
+                moves.push_back({
+                    sq,
+                    sq+2,
+                    squares[sq],
+                    Piece::None,
+                    NONE,
+                    true,
+                    false,
+                    false
+
+                });
+            }
+            if(castlingRights & WHITE_QUEENSIDE && !squares[1] && !squares[2] && !squares[3] && 
+                !isSquareAttacked(1, Piece::Black) && 
+                !isSquareAttacked(2, Piece::Black) && 
+                !isSquareAttacked(3, Piece::Black) ){
+                moves.push_back({
+                    sq,
+                    sq-2,
+                    squares[sq],
+                    Piece::None,
+                    NONE,
+                    true,
+                    false,
+                    false
+
+                });
+            
             }
         }
     }
@@ -760,9 +1117,9 @@ char pieceToChar(int piece) {
             if(squares[to]==(opponentColor | Piece::Knight)) return true;
         }
         if(opponentColor==Piece::White){
-            if(sq%8<7 && sq>9)
+            if(sq%8>0 && sq>9)
                 if(squares[sq-9]==(opponentColor | Piece::Pawn)) return true;
-            if(sq%8>0 && sq>7)
+            if(sq%8<7 && sq>7)
                 if( squares[sq-7]==(opponentColor | Piece::Pawn)) return true;
         }
         if(opponentColor==Piece::Black){
@@ -779,4 +1136,116 @@ char pieceToChar(int piece) {
     bool Board::isInCheck(int movedColor){
         if(movedColor==Piece::White) return (isSquareAttacked(whiteKingSquare, opposite(movedColor)));
         return isSquareAttacked(blackKingSquare, opposite(movedColor));
+    }
+    vector<Move> Board::generateLegalMoves(int color){
+        vector<Move> legalMoves;
+        generateCheckersAndPins(color);
+        if(numCheckers>=2){
+            generateKingMoves(color == Piece::White ? whiteKingSquare:blackKingSquare, legalMoves);
+            return legalMoves;
+        }
+        else{
+            legalMoves=generateMoves();
+        }
+        return legalMoves;
+    }
+    void Board::generateCheckersAndPins(int color){
+    int sq = (color == Piece::White) ? whiteKingSquare : blackKingSquare;
+    int opponentColor = opposite(color);
+
+    numCheckers = 0;
+    Checkers.clear();
+    Pins.clear();
+
+    // --- Sliding pieces: rook-type rays ---
+    for(int d = 0; d < 4; d++){
+        direction dir = (d < 2) ? VERTICAL : HORIZONTAL;
+        int firstBlocker = -1;
+
+        for(int i=0;i<rookRays[sq][d].size();i++){
+            int to=rookRays[sq][d][i];
+            if(squares[to] == Piece::None) continue;
+
+            if(firstBlocker == -1){
+                firstBlocker = to;
+                bool isEnemySlider = (squares[to] == (opponentColor | Piece::Rook)) ||
+                                      (squares[to] == (opponentColor | Piece::Queen));
+                if(isEnemySlider){
+                    numCheckers++;
+                    Checkers.push_back({to,{rookRays[sq][d].begin(),rookRays[sq][d].begin()+i+1}});
+                    break; // king can't also be pinned along the same ray
+                }
+                if((squares[to] & Piece::ColorMask) != opponentColor){
+                    // it's our own piece -- keep scanning for a pinner behind it
+                    continue;
+                }
+                // enemy piece but wrong type for this ray -> dead ray
+                break;
+            } else {
+                // second piece found -- check if it's a pinning slider
+                if(squares[to] == (opponentColor | Piece::Rook) ||
+                   squares[to] == (opponentColor | Piece::Queen)){
+                    Pins.push_back({firstBlocker, to, dir,{rookRays[sq][d].begin(),rookRays[sq][d].begin()+i+1}});
+                }
+                break; // either way, ray is done
+            }
+        }
+    }
+
+    // Sliding pieces
+    for(int d = 0; d < 4; d++){
+        direction dir = (d == 0 || d == 2) ? RIGHT_DIAG : LEFT_DIAG; // NE/SW vs SE/NW
+        int firstBlocker = -1;
+
+        for(int i=0;i<bishopRays[sq][d].size();i++){
+            int to=bishopRays[sq][d][i];
+            if(squares[to] == Piece::None) continue;
+
+            if(firstBlocker == -1){
+                firstBlocker = to;
+                bool isEnemySlider = (squares[to] == (opponentColor | Piece::Bishop)) ||
+                                      (squares[to] == (opponentColor | Piece::Queen));
+                if(isEnemySlider){
+                    numCheckers++;
+                    Checkers.push_back({to,{bishopRays[sq][d].begin(),bishopRays[sq][d].begin()+i+1}});
+                    break;
+                }
+                if((squares[to] & Piece::ColorMask) != opponentColor){
+                    continue;
+                }
+                break;
+            } else {
+                if(squares[to] == (opponentColor | Piece::Bishop) ||
+                   squares[to] == (opponentColor | Piece::Queen)){
+                    Pins.push_back({firstBlocker, to, dir,{bishopRays[sq][d].begin(),bishopRays[sq][d].begin()+i+1}});
+                }
+                break;
+            }
+        }
+    }
+
+    //Knights
+    for(int to : knightAttacks[sq]){
+        if(squares[to] == (opponentColor | Piece::Knight)){
+            numCheckers++;
+            Checkers.push_back({to});
+        }
+    }
+
+    // Pawns 
+    if(color == Piece::White){
+        if(sq%8>0 && sq>7 && squares[sq+7]==(opponentColor|Piece::Pawn)){
+            numCheckers++; Checkers.push_back({sq+7});
+        }
+        if(sq%8<7 && sq>7 && squares[sq+9]==(opponentColor|Piece::Pawn)){
+            numCheckers++; Checkers.push_back({sq+9});
+        }
+    } else {
+        if(sq%8>0 && sq<56 && squares[sq-9]==(opponentColor|Piece::Pawn)){
+            numCheckers++; Checkers.push_back({sq-9});
+        }
+        if(sq%8<7 && sq<56 && squares[sq-7]==(opponentColor|Piece::Pawn)){
+            numCheckers++; Checkers.push_back({sq-7});
+        }
+    }
     }

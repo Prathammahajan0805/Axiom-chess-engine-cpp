@@ -9,8 +9,22 @@ struct Undo {
     int castlingRights;
     int enPassantSquare;
 };
-
-
+enum direction{
+    VERTICAL=1,
+    HORIZONTAL=2,
+    RIGHT_DIAG=3,
+    LEFT_DIAG=4
+};
+struct pin{
+    int pinned_piece;
+    int attacking_piece;
+    direction dir;
+    std::vector<int> legalSquares;
+};
+struct checker{
+    int attackerSq;
+    std::vector<int> blockSquares;
+};
 class Board {
 public:
     Board();
@@ -29,6 +43,9 @@ public:
     // Debug
     void display() const;
 
+    //legal moves
+    std::vector<Move> generateLegalMoves(int color);
+
     // Move generation
     std::vector<Move> generateMoves();
     void makeMove(const Move&);
@@ -43,13 +60,18 @@ private:
     int prevcastlingRights=15;
     int whiteKingSquare;
     int blackKingSquare;
+    int numCheckers=0;
     // Precomputed attacks
     std::vector<int> knightAttacks[64];
     std::vector<int> kingAttacks[64];
-    std::vector<Undo> history;
     std::vector<int> rookRays[64][4];
     std::vector<int> bishopRays[64][4];
+
+    //board logics
+    std::vector<Undo> history;
     std::vector<Move> moveHistory;
+    std::vector<pin> Pins;
+    std::vector<checker> Checkers;
 
     static const std::string startFEN;
 
@@ -61,6 +83,7 @@ private:
     void precomputeKing();
     void precomputeRookRays();
     void precomputeBishopRays();
+    void generateCheckersAndPins(int color);
 
     // Piece move generators
     void generatePawnMoves(int sq, std::vector<Move>& moves);
@@ -76,4 +99,7 @@ private:
 
     //check if in check
     bool isInCheck(int MovedColor);
+    bool isSquareBlockingCheck(int sq);
+    bool isCheckersSquare(int sq);
+    bool isPiecePinned(int sq);
 };
