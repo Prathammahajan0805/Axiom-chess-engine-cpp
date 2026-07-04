@@ -102,4 +102,7 @@ private:
     bool isSquareBlockingCheck(int sq);
     bool isCheckersSquare(int sq);
     bool isPiecePinned(int sq);
+    std::vector<Move> legalityFilter(std::vector<Move>& legalmoves);
+    bool checkPinLimits(pin p,int sq);
+    pin givePinInfo(int sq);
 };
