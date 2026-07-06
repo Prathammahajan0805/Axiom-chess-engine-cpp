@@ -1,18 +1,11 @@
 #include <iostream>
-#include <vector>
-#include <string>
-#include <cctype>
 #include "board.h"
-#include "move.h"
-#include "piece.h"
 using namespace std;
 int main() {
     Board board;
     board.display();
-    string italianFEN = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R";
-    board.loadFEN(italianFEN);
-    board.display();
     cout << "FEN: " << board.toFEN() << "\n";
-    
+    board.loadFEN("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
+    board.divide(6);
     return 0;
 }

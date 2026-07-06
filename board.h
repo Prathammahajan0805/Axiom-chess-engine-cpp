@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 #include <string>
 
@@ -48,18 +49,22 @@ public:
 
     // Move generation
     std::vector<Move> generateMoves();
+    std::vector<Move> legalityFilter(std::vector<Move>& legalmoves);
     void makeMove(const Move&);
     void unmakeMove();
+    //perft
+    uint64_t perft(int depth);
+    void divide(int depth);
 private:
-    
+    std::string moveToString(const Move& m);
     // Board representation
     std::vector<int> squares;
-    int sideToMove;
+    int sideToMove=Piece::White;
     int enpassentSquare=-1;
     int castlingRights=15;
     int prevcastlingRights=15;
-    int whiteKingSquare;
-    int blackKingSquare;
+    int whiteKingSquare=4;
+    int blackKingSquare=60;
     int numCheckers=0;
     // Precomputed attacks
     std::vector<int> knightAttacks[64];
@@ -73,7 +78,8 @@ private:
     std::vector<pin> Pins;
     std::vector<checker> Checkers;
 
-    static const std::string startFEN;
+    std::string startFEN= "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    
 
     // Helpers
     bool isopponent(int a, int b);
@@ -102,7 +108,9 @@ private:
     bool isSquareBlockingCheck(int sq);
     bool isCheckersSquare(int sq);
     bool isPiecePinned(int sq);
-    std::vector<Move> legalityFilter(std::vector<Move>& legalmoves);
+    
     bool checkPinLimits(pin p,int sq);
     pin givePinInfo(int sq);
+
+    
 };

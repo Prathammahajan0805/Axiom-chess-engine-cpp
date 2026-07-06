@@ -2,8 +2,10 @@
 #include "move.h"
 #include "piece.h"
 #include <cctype>
+#include <cstdint>
 #include<vector>
 #include<iostream>
+#include<sstream>
 constexpr int WHITE_KINGSIDE  = 1 << 0;
 constexpr int WHITE_QUEENSIDE = 1 << 1;
 constexpr int BLACK_KINGSIDE  = 1 << 2;
@@ -207,7 +209,7 @@ char pieceToChar(int piece) {
                 }
             }
             //check for enpassent right
-            if(sq+9==enpassentSquare){
+            if(sq+9==enpassentSquare && file<7){
                 moves.push_back({
                     sq,
                     sq+9,
@@ -220,12 +222,12 @@ char pieceToChar(int piece) {
                 });
             }
             //check for enpassanst left
-            if(sq+7==enpassentSquare){
+            if(sq+7==enpassentSquare && file>0){
                 moves.push_back({
                     sq,
                     sq+7,
                     squares[sq],
-                    squares[sq+1],
+                    squares[sq-1],
                     NONE,
                     false,
                     true,
@@ -337,7 +339,7 @@ char pieceToChar(int piece) {
                     });
                 }
             }
-            if(sq-7==enpassentSquare){
+            if(sq-7==enpassentSquare && file<7){
                 moves.push_back({
                     sq,
                     sq-7,
@@ -350,7 +352,7 @@ char pieceToChar(int piece) {
                 });
             }
             //check for enpassanst left
-            if(sq-9==enpassentSquare){
+            if(sq-9==enpassentSquare && file>0){
                 moves.push_back({
                     sq,
                     sq-9,
@@ -441,7 +443,11 @@ char pieceToChar(int piece) {
     }
     void Board::generateKingMoves(int sq,vector<Move>& moves){
         for(int to:kingAttacks[sq]){
-            if(!squares[to]){
+            int temp=squares[sq];
+            squares[sq]=Piece::None;
+            int attacked=isSquareAttacked(to, opposite(temp & Piece::ColorMask));
+            squares[sq]=temp;
+            if(!squares[to] && !attacked){
                 //quiet move
                 moves.push_back({
                     sq,
@@ -454,7 +460,7 @@ char pieceToChar(int piece) {
                     false
 
                 });
-            }else if(isopponent(squares[sq],squares[to])){
+            }else if(isopponent(squares[sq],squares[to]) && !attacked){
                 //capture move
                 moves.push_back({
                     sq,
@@ -469,8 +475,8 @@ char pieceToChar(int piece) {
                 });
             }
         }
-        if((squares[sq] &Piece::ColorMask)==Piece::Black){
-            if(castlingRights & BLACK_KINGSIDE && !squares[62] && !squares[61] && !isSquareAttacked(61, Piece::White) && !isSquareAttacked(62, Piece::White)){
+        if((squares[sq] &Piece::ColorMask)==Piece::Black && !isInCheck(Piece::Black)){
+            if(castlingRights & BLACK_KINGSIDE && !squares[62] && !squares[61] &&  !isSquareAttacked(61, Piece::White) && !isSquareAttacked(62, Piece::White)){
                 moves.push_back({
                     sq,
                     sq+2,
@@ -484,7 +490,6 @@ char pieceToChar(int piece) {
                 });
             }
             if(castlingRights & BLACK_QUEENSIDE && !squares[57] && !squares[58] && !squares[59] && 
-                    !isSquareAttacked(57, Piece::White) && 
                     !isSquareAttacked(58, Piece::White) && 
                     !isSquareAttacked(59, Piece::White) ){
                 moves.push_back({
@@ -500,7 +505,7 @@ char pieceToChar(int piece) {
                 });
             }
         }
-        else{
+        else if((squares[sq] &Piece::ColorMask)==Piece::White &&!isInCheck(Piece::White)){
             if(castlingRights & WHITE_KINGSIDE && !squares[5] && !squares[6] &&
                  !isSquareAttacked(6, Piece::Black) && 
                  !isSquareAttacked(5, Piece::Black)){
@@ -517,7 +522,6 @@ char pieceToChar(int piece) {
                 });
             }
             if(castlingRights & WHITE_QUEENSIDE && !squares[1] && !squares[2] && !squares[3] && 
-                !isSquareAttacked(1, Piece::Black) && 
                 !isSquareAttacked(2, Piece::Black) && 
                 !isSquareAttacked(3, Piece::Black) ){
                 moves.push_back({
@@ -601,26 +605,87 @@ char pieceToChar(int piece) {
     void Board::setPiece(int index, int piece) {
         squares[index] = piece;
     }
-    void Board::loadFEN(const string& fen) {
+    void Board::loadFEN(const std::string& fen) {
         squares.assign(64, Piece::None);
-        
-        int rank = 7, file = 0;
-        
-        for (char c : fen) {
+
+        std::stringstream ss(fen);
+
+        std::string boardPart;
+        std::string sidePart;
+        std::string castlePart;
+        std::string epPart;
+        int halfmove, fullmove;
+
+        ss >> boardPart >> sidePart >> castlePart >> epPart >> halfmove >> fullmove;
+
+        // ---------------- Piece placement ----------------
+
+        int rank = 7;
+        int file = 0;
+
+        for (char c : boardPart) {
+
             if (c == '/') {
-                file = 0;
                 rank--;
+                file = 0;
+                continue;
             }
-            else if (isdigit(c)) {
-                file += (c - '0');
+
+            if (isdigit(c)) {
+                file += c - '0';
+                continue;
             }
-            else {
-                int color = isupper(c) ? Piece::White : Piece::Black;
-                int pieceType = charToPiece(c);
-                setPiece(rank, file, color | pieceType);
-                file++;
+
+            int color = isupper(c) ? Piece::White : Piece::Black;
+            int piece = charToPiece(c);
+
+            squares[rank * 8 + file] = color | piece;
+
+            if (piece == Piece::King) {
+                if (color == Piece::White)
+                    whiteKingSquare = rank * 8 + file;
+                else
+                    blackKingSquare = rank * 8 + file;
             }
+
+            file++;
         }
+
+        // ---------------- Side to move ----------------
+
+        sideToMove = (sidePart == "w") ? Piece::White : Piece::Black;
+
+        // ---------------- Castling ----------------
+
+        castlingRights = 0;
+
+        if (castlePart.find('K') != std::string::npos)
+            castlingRights |= WHITE_KINGSIDE;
+
+        if (castlePart.find('Q') != std::string::npos)
+            castlingRights |= WHITE_QUEENSIDE;
+
+        if (castlePart.find('k') != std::string::npos)
+            castlingRights |= BLACK_KINGSIDE;
+
+        if (castlePart.find('q') != std::string::npos)
+            castlingRights |= BLACK_QUEENSIDE;
+
+        // ---------------- En passant ----------------
+
+        if (epPart == "-") {
+            enpassentSquare = -1;
+        }
+        else {
+            int file = epPart[0] - 'a';
+            int rank = epPart[1] - '1';
+            enpassentSquare = rank * 8 + file;
+        }
+
+        // ---------------- History ----------------
+
+        moveHistory.clear();
+        history.clear();
     }
     void Board::display() const {
         cout << "\n  a b c d e f g h\n";
@@ -878,7 +943,7 @@ char pieceToChar(int piece) {
             if(squares[to]==(opponentColor | Piece::Knight)) return true;
         }
         if(opponentColor==Piece::White){
-            if(sq%8>0 && sq>9)
+            if(sq%8>0 && sq>=9)
                 if(squares[sq-9]==(opponentColor | Piece::Pawn)) return true;
             if(sq%8<7 && sq>7)
                 if( squares[sq-7]==(opponentColor | Piece::Pawn)) return true;
@@ -945,8 +1010,8 @@ char pieceToChar(int piece) {
                 break;
             } else {
                 // second piece found -- check if it's a pinning slider
-                if(squares[to] == (opponentColor | Piece::Rook) ||
-                   squares[to] == (opponentColor | Piece::Queen)){
+                if((squares[to] == (opponentColor | Piece::Rook) ||
+                   squares[to] == (opponentColor | Piece::Queen) )&& (squares[firstBlocker] & Piece::ColorMask)==color){
                     Pins.push_back({firstBlocker, to, dir,{rookRays[sq][d].begin(),rookRays[sq][d].begin()+i+1}});
                 }
                 break; // either way, ray is done
@@ -977,8 +1042,8 @@ char pieceToChar(int piece) {
                 }
                 break;
             } else {
-                if(squares[to] == (opponentColor | Piece::Bishop) ||
-                   squares[to] == (opponentColor | Piece::Queen)){
+                if((squares[to] == (opponentColor | Piece::Bishop) ||
+                   squares[to] == (opponentColor | Piece::Queen)) && (squares[firstBlocker] & Piece::ColorMask)==color){
                     Pins.push_back({firstBlocker, to, dir,{bishopRays[sq][d].begin(),bishopRays[sq][d].begin()+i+1}});
                 }
                 break;
@@ -1014,6 +1079,10 @@ char pieceToChar(int piece) {
     vector<Move> Board::legalityFilter(vector<Move>& legalMoves){
         vector<Move> moves;
         for(auto &move:legalMoves){
+            if((move.movedpiece & Piece::TypeMask) == Piece::King){
+                moves.push_back(move);   // already fully validated in generateKingMoves
+                continue;
+            }
             bool ispinned=isPiecePinned(move.from);
             if(ispinned && (move.movedpiece & Piece::TypeMask) == Piece::Knight) continue;
             pin p;
@@ -1032,6 +1101,7 @@ char pieceToChar(int piece) {
             else if(numCheckers && ispinned){
                 if((isSquareBlockingCheck(move.to) || isCheckersSquare(move.to)) && (checkPinLimits(p, move.to) || p.attacking_piece == move.to)) moves.push_back(move);
             }
+            else moves.push_back(move);
             }
             else{
                 makeMove(move);
@@ -1078,4 +1148,50 @@ char pieceToChar(int piece) {
             if(sq==allowedSquares) return true;
         }
         return false;
+    }
+    uint64_t Board::perft(int depth){
+        if(depth==0) return 1;
+        auto moves=generateLegalMoves(sideToMove);
+        uint64_t nodes=0;
+        for(Move m:moves){
+            makeMove(m);
+            nodes+=perft(depth-1);
+            unmakeMove();
+        }
+        return nodes;
+    }
+    string Board::moveToString(const Move& m) {
+        auto squareToString = [](int sq) {
+            std::string s;
+            s += char('a' + (sq % 8));
+            s += char('1' + (sq / 8));
+            return s;
+        };
+
+        std::string str = squareToString(m.from) + squareToString(m.to);
+
+        if (m.promotion != NONE) {
+            switch (m.promotion) {
+                case QUEEN:  str += 'q'; break;
+                case ROOK:   str += 'r'; break;
+                case BISHOP: str += 'b'; break;
+                case KNIGHT: str += 'n'; break;
+                case NONE: break;
+            }
+        }
+
+        return str;
+    }
+    void Board::divide(int depth) {
+        auto moves = generateLegalMoves(sideToMove);
+        uint64_t total = 0;
+        for (auto &m : moves) {
+            makeMove(m);
+            uint64_t nodes = perft(depth - 1);
+            unmakeMove();
+
+            cout << moveToString(m) << " : " << nodes << '\n';
+            total += nodes;
+        }
+        cout << "Total = " << total << '\n';
     }
