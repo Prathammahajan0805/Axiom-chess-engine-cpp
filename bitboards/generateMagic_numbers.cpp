@@ -1,5 +1,4 @@
 #include "bitboards.h"
-#include "magic.h"
 #include<iostream>
 #include <iomanip>
 #include <vector>

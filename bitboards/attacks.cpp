@@ -2,6 +2,7 @@
 #include "bitboards.h"
 #include "board.h"
 #include "magic.h"
+#include <cstdint>
 
 Bitboard pawnAttacks[2][64];
 Bitboard knightAttacks[64];
@@ -10,6 +11,9 @@ Bitboard bishopAttacksMask[64];
 Bitboard rookAttacksMask[64];
 Bitboard rookAttacks[64][4096];
 Bitboard bishopAttacks[64][512];
+Bitboard line[64][64];
+Bitboard between[64][64];
+
 static Bitboard maskKnightAttacks(int sq){
     Bitboard attacks=0ULL;
     int rank=sq/8;
@@ -211,4 +215,36 @@ void initSliderAttacks(bool isBishop){
     }
 }
 
+int getStep(int from,int to){
+    int dr = (to / 8) - (from / 8);
+    int df = (to % 8) - (from % 8);
+    dr = (dr > 0) - (dr < 0);
+    df = (df > 0) - (df < 0);
+
+    return dr * 8 + df;
+}
+void initLineBetween(){
+    memset(line, 0, sizeof(line));
+    memset(between, 0, sizeof(between));
+    for(int from=0;from<64;from++){
+        Bitboard queenRay = rookAttacksOnTheFly(from, 0ULL) | bishopAttacksOnTheFly(from, 0ULL);
+        for(int to=0;to<64;to++){
+            if (from == to) {
+                setBit(line[from][from], from);
+                continue;
+            }
+            if(!getBit(queenRay,to)) continue;
+            int step=getStep(from, to);
+            int sq = from;
+            while (sq != to) {
+                setBit(line[from][to], sq);
+                sq += step;
+                if (sq != to)
+                    setBit(between[from][to], sq);
+            }
+
+            setBit(line[from][to], to);
+        }
+    }
+}
 
