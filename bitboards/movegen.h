@@ -15,8 +15,9 @@ struct checkInfo{
     Bitboard pinned;
     Bitboard pinRay[64];
 };
-void generatePawnMoves(int sq,MoveList& createMove,Board& board,Color color);
-void generateKnightMoves(int sq,MoveList& createMove);
-void generateKingMoves(int sq,MoveList& createMove);
-void generateSlidingPieces(int sq,MoveList& createMove,Piece piece);
+void generateCheckersAndPins(Board &board,checkInfo &info);
+void generatePawnMoves(MoveList& createMove,Board& board,Color color,checkInfo& info);
+void generateKnightMoves(int sq,MoveList& createMove,checkInfo& info);
+void generateKingMoves(int sq,MoveList& createMove,checkInfo& info);
+void generateSlidingPieces(int sq,MoveList& createMove,Piece piece,checkInfo& info);
 MoveList generateMoves(Board& board);

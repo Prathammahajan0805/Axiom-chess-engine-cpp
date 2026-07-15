@@ -13,7 +13,15 @@ Bitboard rookAttacks[64][4096];
 Bitboard bishopAttacks[64][512];
 Bitboard line[64][64];
 Bitboard between[64][64];
+int rookShifts[64];
+int bishopShifts[64];
 
+void initShifts(){
+    for(int i=0;i<64;i++){
+        rookShifts[i]=popCount(rookAttacksMask[i]);
+        bishopShifts[i]=popCount(bishopAttacksMask[i]);
+    }
+}
 static Bitboard maskKnightAttacks(int sq){
     Bitboard attacks=0ULL;
     int rank=sq/8;

@@ -19,7 +19,7 @@ struct Move{
     static constexpr uint32_t isCastlingMask=1u<<27;
 };
 
-inline Move makeMove(uint32_t from,
+inline Move addMove(uint32_t from,
     uint32_t to,
     uint32_t movedPiece,
     uint32_t capturePiece=0,

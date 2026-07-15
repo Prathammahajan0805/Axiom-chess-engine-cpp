@@ -2,7 +2,7 @@
 #include "bitboards.h"
 #include <cstdint>
 
-uint64_t magicIndex(Bitboard occupied, int m,int shift,Bitboard mask){
+uint64_t magicIndex(Bitboard occupied, Bitboard m,int shift,Bitboard mask){
     Bitboard blockers = occupied & mask;
     return (blockers * m) >> shift;
 }
