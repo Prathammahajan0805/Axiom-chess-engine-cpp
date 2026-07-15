@@ -31,7 +31,8 @@ MoveList generateMoves(Board &board){
     }
     return createMove;
 }
- // calc checkmask at the end popping the checkers;
+
+//generate checkers and pins
 void generateCheckersAndPins(Board &board, checkInfo &info){
     int sq=board.sideToMove==WHITE?board.whiteKingSquare:board.blackKingSquare;
     Bitboard ownPieces=board.sideToMove==WHITE?board.whitePieces:board.blackPieces;
