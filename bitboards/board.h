@@ -61,7 +61,13 @@ class Board{
 
             occupied = whitePieces | blackPieces;
         }
-
+        inline Piece findPiece(Color color,int sq){
+            int offset=color*6;
+            Bitboard bit=0ULL;
+            setBit(bit, sq);
+            for(int i=WP;i<=WK;i++) if(bit & pieces[i+offset]) return (Piece)(i+offset);
+            return NO_PIECE;
+        }
         void loadFEN(const std::string &fen);
 
         void print() const;

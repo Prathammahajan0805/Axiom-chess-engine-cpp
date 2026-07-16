@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <vector>
 #include <string>
-
 #include "piece.h"
 #include "move.h"
 struct Undo {
@@ -26,6 +25,7 @@ struct checker{
     int attackerSq;
     std::vector<int> blockSquares;
 };
+
 class Board {
 public:
     Board();

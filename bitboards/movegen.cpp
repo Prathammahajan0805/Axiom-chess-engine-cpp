@@ -103,10 +103,14 @@ void generateCheckersAndPins(Board &board, checkInfo &info){
 }
 
 void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInfo &info){
-    int opponentColor=color==WHITE?BLACK:WHITE;
+    Color opponentColor=color==WHITE?BLACK:WHITE;
+    Bitboard opponents = color==WHITE? board.blackPieces:board.whitePieces;
     int myColOffset=color*6;
     int offset=opponentColor*6;
+    int myKingSq=color==WHITE? board.whiteKingSquare:board.blackKingSquare;
 
+    Bitboard enemyRooksQueens = board.pieces[WR + offset] | board.pieces[WQ + offset];
+    Bitboard enemyBishopsQueens = board.pieces[WB + offset] | board.pieces[WQ + offset];
     //single push
     Bitboard single = ((color==WHITE )?
             board.pieces[WP+myColOffset]<<8
@@ -147,4 +151,51 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
         }
         }   
     }
+
+    //capturing moves
+    Bitboard pawns=board.pieces[WP+myColOffset];
+    
+    while(pawns){
+        Bitboard enpassants=0ULL;
+        int sq=popLSB(pawns);
+        Bitboard attacks = pawnAttacks[color][sq] & opponents;
+        if(board.enPassantSquare!=NO_SQUARE) enpassants = pawnAttacks[color][sq] & (1ULL<<board.enPassantSquare);
+        attacks &=info.checkMask;
+        promotion=attacks & promotionRank;
+        attacks &= ~promotionRank;
+        enpassants &=info.checkMask;
+        //normal attacks
+        while(attacks){
+            int to=popLSB(attacks);
+            Piece p=board.findPiece(opponentColor,to);
+            if((1ULL<<to) & info.pinRay[sq]){
+                createMove.moves[createMove.count++]=addMove(sq, to, WP+myColOffset,p,0,true);
+            }
+        }
+        //promotion captures
+        while(promotion){
+            int to=popLSB(promotion);
+            Piece p=board.findPiece(opponentColor,to);
+            if ((1ULL << to) & info.pinRay[sq]) {
+            for(int i=WN+myColOffset;i<=WQ+myColOffset;i++){
+                createMove.moves[createMove.count++]=addMove(sq, to, WP+myColOffset,p,i,true);
+            }
+            }  
+        }
+        //enpassants
+        while(enpassants){
+            int to=popLSB(enpassants);
+            Piece p=board.findPiece(opponentColor,color==WHITE?to-8:to+8);
+            Bitboard occ=board.occupied;
+            occ^=(1ULL<<sq);
+            occ|=(1ULL<<to);
+            int capturedSq = (color == WHITE) ? to - 8 : to + 8;
+            occ ^= (1ULL << capturedSq);
+            if((getRookAttacks(myKingSq,occ) & enemyRooksQueens) || 
+            (getBishopAttacks(myKingSq, occ) & enemyBishopsQueens)) continue;
+            if(info.pinRay[sq]&(1ULL<<to)) createMove.moves[createMove.count++]=addMove(sq, to,WP+myColOffset,p,0,true,false,true);
+        }
+        
+    }
+    
 }
