@@ -17,7 +17,8 @@ struct checkInfo{
 };
 void generateCheckersAndPins(Board &board,checkInfo &info);
 void generatePawnMoves(MoveList& createMove,Board& board,Color color,checkInfo& info);
-void generateKnightMoves(int sq,MoveList& createMove,checkInfo& info);
-void generateKingMoves(int sq,MoveList& createMove,checkInfo& info);
-void generateSlidingPieces(int sq,MoveList& createMove,Piece piece,checkInfo& info);
+void generateKnightMoves(MoveList& createMove,checkInfo& info,Board& board);
+void generateKingMoves(MoveList& createMove,checkInfo& info,Board& board);
+void generateSlidingPieces(MoveList& createMove,Piece piece,checkInfo& info,Board& board);
+bool isSquareAttacked(int sq,Color attacker,Bitboard occupied,const Board& board);
 MoveList generateMoves(Board& board);

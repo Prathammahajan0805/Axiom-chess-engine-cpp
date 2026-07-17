@@ -222,7 +222,12 @@ void initSliderAttacks(bool isBishop){
         }
     }
 }
-
+void initAllSliderAttacks(){
+    initBishopReleventOccupancyMask();
+    initRookReleventOccupancyMask();
+    initSliderAttacks(true);
+    initSliderAttacks(false);
+}
 int getStep(int from,int to){
     int dr = (to / 8) - (from / 8);
     int df = (to % 8) - (from % 8);

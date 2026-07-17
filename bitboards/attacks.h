@@ -4,6 +4,7 @@
 #include"bitboards.h"
 #include "board.h"
 #include "magic.h"
+#include <cstring>
 
 extern Bitboard pawnAttacks[2][64];
 extern Bitboard knightAttacks[64];
@@ -21,15 +22,16 @@ void initLineBetween();
 void initLeaperAttacks();
 void initBishopReleventOccupancyMask();
 void initRookReleventOccupancyMask();
-void initSliderAttacks();
+void initSliderAttacks(bool isBishop);
+void initAllSliderAttacks();
 void initShifts();
 
 inline Bitboard getRookAttacks(int sq,Bitboard occupancy){
-    int index=magicIndex(occupancy,rookMagicNumbers[sq],64-rookShifts[sq],rookAttacksMask[sq]);
+    Bitboard index=magicIndex(occupancy,rookMagicNumbers[sq],64-rookShifts[sq],rookAttacksMask[sq]);
     return rookAttacks[sq][index];
 }
 
 inline Bitboard getBishopAttacks(int sq,Bitboard occupancy){
-    int index=magicIndex(occupancy,bishopMagicNumbers[sq],64-bishopShifts[sq], rookAttacksMask[sq]);
+    Bitboard index=magicIndex(occupancy,bishopMagicNumbers[sq],64-bishopShifts[sq], bishopAttacksMask[sq]);
     return bishopAttacks[sq][index];
 }

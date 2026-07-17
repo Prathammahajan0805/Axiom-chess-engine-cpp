@@ -37,6 +37,7 @@ char pieceToChar(Piece piece){
 void Board::clearBoard() {
     for (int i = 0; i < 12; i++)
         pieces[i] = 0ULL;
+    std::fill(pieceOn.begin(), pieceOn.end(), NO_PIECE);
     whitePieces = 0ULL;
     blackPieces = 0ULL;
     occupied = 0ULL;
@@ -80,10 +81,10 @@ void Board::loadFEN(const string& fen) {
             }
 
             
-            int piece = charToPiece(c);
+            Piece piece = (Piece) charToPiece(c);
             setBit(pieces[piece],getSquare(file, rank));
-            
-            if (piece == WK) 
+            pieceOn[getSquare(file, rank)]=piece;
+            if(piece == WK)
                 whiteKingSquare = getSquare(file,  rank);
             if(piece == BK)
                 blackKingSquare = getSquare(file,  rank);
@@ -128,9 +129,10 @@ void Board::print() const{
     displayBitboard(occupied);
 }
 Board::Board(){
+    pieceOn.assign(64,NO_PIECE);
     loadFEN(startingFen);
     initLeaperAttacks();
-    initBishopReleventOccupancyMask();
-    initRookReleventOccupancyMask();
-    initSliderAttacks();
+    initLineBetween();
+    initAllSliderAttacks();
+    initShifts();
 }

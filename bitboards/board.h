@@ -1,6 +1,7 @@
 #pragma once
 
 #include<iostream>
+#include<vector>
 #include"bitboards.h"
 enum Piece : int {
     WP, WN, WB, WR, WQ, WK,
@@ -34,9 +35,10 @@ class Board{
     private:
         void clearBoard();
         std::string const startingFen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        
     public:
+        std::vector<Piece> pieceOn;
         Bitboard pieces[12];
-
         Bitboard whitePieces;
         Bitboard blackPieces;
         Bitboard occupied;
@@ -60,13 +62,6 @@ class Board{
                 pieces[BR] | pieces[BQ] | pieces[BK];
 
             occupied = whitePieces | blackPieces;
-        }
-        inline Piece findPiece(Color color,int sq){
-            int offset=color*6;
-            Bitboard bit=0ULL;
-            setBit(bit, sq);
-            for(int i=WP;i<=WK;i++) if(bit & pieces[i+offset]) return (Piece)(i+offset);
-            return NO_PIECE;
         }
         void loadFEN(const std::string &fen);
 
