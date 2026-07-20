@@ -32,6 +32,7 @@ char pieceToChar(Piece piece){
         case BK: return 'k';break;
         case NO_PIECE: return '\0';break;
     }
+    return '\0';
 }
 
 void Board::clearBoard() {
@@ -129,7 +130,7 @@ void Board::print() const{
     displayBitboard(occupied);
 }
 Board::Board(){
-    pieceOn.assign(64,NO_PIECE);
+    pieceOn.fill(NO_PIECE);
     loadFEN(startingFen);
     initLeaperAttacks();
     initLineBetween();

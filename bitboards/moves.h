@@ -4,7 +4,6 @@
 #include<iostream>
 #include <string>
 #include"bitboards.h"
-#include "board.h"
 struct Move{
     uint32_t moveInfo;
 
@@ -18,12 +17,12 @@ struct Move{
     static constexpr uint32_t isEnPassantMask=1u<<26;
     static constexpr uint32_t isCastlingMask=1u<<27;
 };
-
+#include "board.h"
 inline Move addMove(uint32_t from,
     uint32_t to,
     uint32_t movedPiece,
     uint32_t capturePiece=0,
-    uint32_t promotionPiece=0,
+    uint32_t promotionPiece=NO_PIECE,
     bool isCapture=false,
     bool isDoublePawnPush=false,
     bool isEnPassant=false,

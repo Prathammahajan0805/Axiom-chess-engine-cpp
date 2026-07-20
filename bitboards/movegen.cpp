@@ -3,6 +3,7 @@
 #include "attacks.h"
 #include "bitboards.h"
 #include "board.h"
+#include "makeMove.h"
 #include "moves.h"
 
 
@@ -37,7 +38,6 @@ void generateCheckersAndPins(Board &board, checkInfo &info){
     info.checkers=0ULL;
     info.checkMask=0ULL;
     info.pinned=0ULL;
-    for(int i=0;i<64;i++) info.pinRay[i]= ~(0ULL);
     //-------------------------------------check calc--------------------------------
     //pawns
     
@@ -97,7 +97,6 @@ void generateCheckersAndPins(Board &board, checkInfo &info){
         }
     }
 }
-
 void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInfo &info){
     Color opponentColor=color==WHITE?BLACK:WHITE;
     Bitboard opponents = color==WHITE? board.blackPieces:board.whitePieces;
@@ -127,21 +126,21 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
     while(single){
         int to=popLSB(single);
         int from= color==WHITE? to-8:to+8;
-        if((1ULL<<to )& info.pinRay[from]){
+        if((pinAllows(from,info, to))){
             createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset);
         }
     }
     while(dblPush){
         int to=popLSB(dblPush);
         int from= color==WHITE? to-16:to+16;
-        if((1ULL<<to )& info.pinRay[from]){
-            createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset,0,0,false,true);
+        if((pinAllows(from,info, to))){
+            createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset,0,NO_PIECE,false,true);
         }
     }
     while(promotion){
         int to=popLSB(promotion);
         int from=color==WHITE?to-8:to+8;
-        if ((1ULL << to) & info.pinRay[from]) {
+        if (pinAllows(from,info,to)) {
         for(int i=WN+myColOffset;i<=WQ+myColOffset;i++){
             createMove.moves[createMove.count++]=addMove(from, to, WP+myColOffset,0,i);
         }
@@ -164,15 +163,15 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
         while(attacks){
             int to=popLSB(attacks);
             Piece p=board.pieceOn[to];
-            if((1ULL<<to) & info.pinRay[sq]){
-                createMove.moves[createMove.count++]=addMove(sq, to, WP+myColOffset,p,0,true);
+            if(pinAllows(sq,info,to)){
+                createMove.moves[createMove.count++]=addMove(sq, to, WP+myColOffset,p,NO_PIECE,true);
             }
         }
         //promotion captures
         while(promotion){
             int to=popLSB(promotion);
             Piece p=board.pieceOn[to];
-            if ((1ULL << to) & info.pinRay[sq]) {
+            if (pinAllows(sq,info,to)) {
             for(int i=WN+myColOffset;i<=WQ+myColOffset;i++){
                 createMove.moves[createMove.count++]=addMove(sq, to, WP+myColOffset,p,i,true);
             }
@@ -189,7 +188,7 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
             occ ^= (1ULL << capturedSq);
             if((getRookAttacks(myKingSq,occ) & enemyRooksQueens) || 
             (getBishopAttacks(myKingSq, occ) & enemyBishopsQueens)) continue;
-            if(info.pinRay[sq]&(1ULL<<to)) createMove.moves[createMove.count++]=addMove(sq, to,WP+myColOffset,p,0,true,false,true);
+            if(pinAllows(sq,info,to)) createMove.moves[createMove.count++]=addMove(sq, to,WP+myColOffset,p,NO_PIECE,true,false,true);
         }
         
     }
@@ -226,7 +225,7 @@ void generateKnightMoves(MoveList &createMove, checkInfo &info,Board &board){
         while(captures){
             int to = popLSB(captures);
             int capturedPiece=board.pieceOn[to];
-            createMove.moves[createMove.count++]=addMove(sq, to,WN+myColOff,capturedPiece,0,true);
+            createMove.moves[createMove.count++]=addMove(sq, to,WN+myColOff,capturedPiece,NO_PIECE,true);
         }
     }
 }
@@ -263,7 +262,7 @@ void generateKingMoves(MoveList &createMove, checkInfo &info,Board& board){
             int to =popLSB(captures);
             int capturePiece=board.pieceOn[to];
             if(!isSquareAttacked(to, attacker,board.occupied^(1ULL<<sq),board)){
-                createMove.moves[createMove.count++]=addMove(sq, to,WK+myColOff,capturePiece,0,true);
+                createMove.moves[createMove.count++]=addMove(sq, to,WK+myColOff,capturePiece,NO_PIECE,true);
             }
         }
         if (isSquareAttacked(sq, attacker, board.occupied, board))
@@ -274,7 +273,7 @@ void generateKingMoves(MoveList &createMove, checkInfo &info,Board& board){
                 to, 
                 WK+myColOff,
                 0,
-                0,
+                NO_PIECE,
                 false,
                 false,
                 false,
@@ -286,7 +285,7 @@ void generateKingMoves(MoveList &createMove, checkInfo &info,Board& board){
                 to, 
                 WK+myColOff,
                 0,
-                0,
+                NO_PIECE,
                 false,
                 false,
                 false,
@@ -315,7 +314,7 @@ void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,Bo
 
             while(silent){
                 int to=popLSB(silent);
-                if((1ULL<<to) & info.pinRay[sq]){
+                if(pinAllows(sq,info,to)){
                     createMove.moves[createMove.count++]=addMove(sq, to,piece);
                 }
             }
@@ -323,8 +322,8 @@ void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,Bo
             while(captures){
                 int to = popLSB(captures);
                 Piece capturePiece=board.pieceOn[to];
-                if((1ULL<<to) & info.pinRay[sq]){
-                    createMove.moves[createMove.count++]=addMove(sq, to,piece,capturePiece,0,true);
+                if(pinAllows(sq,info,to)){
+                    createMove.moves[createMove.count++]=addMove(sq, to,piece,capturePiece,NO_PIECE,true);
                 }
             }
         }
@@ -342,7 +341,7 @@ void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,Bo
 
             while(silent){
                 int to=popLSB(silent);
-                if((1ULL<<to) & info.pinRay[sq]){
+                if(pinAllows(sq,info,to)){
                     createMove.moves[createMove.count++]=addMove(sq, to,piece);
                 }
             }
@@ -350,8 +349,8 @@ void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,Bo
             while(captures){
                 int to = popLSB(captures);
                 Piece capturePiece=board.pieceOn[to];
-                if((1ULL<<to) & info.pinRay[sq]){
-                    createMove.moves[createMove.count++]=addMove(sq, to,piece,capturePiece,0,true);
+                if(pinAllows(sq,info,to)){
+                    createMove.moves[createMove.count++]=addMove(sq, to,piece,capturePiece,NO_PIECE,true);
                 }
             }
         }

@@ -3,11 +3,20 @@
 #include<iostream>
 #include<vector>
 #include"bitboards.h"
+#include<array>
+struct Undo{
+    int enPassantSq;
+    int whiteKingSq;
+    int blackKingSq;
+    int castlingRights;
+};
+
 enum Piece : int {
     WP, WN, WB, WR, WQ, WK,
     BP, BN, BB, BR, BQ, BK,
     NO_PIECE
 };
+#include "moves.h"
 enum dir :int {
     NORTH=8,
     SOUTH=-NORTH,
@@ -37,12 +46,15 @@ class Board{
         std::string const startingFen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         
     public:
-        std::vector<Piece> pieceOn;
+        std::array<Piece,64> pieceOn;
+        std::array<Undo,512> history;
+        std::array<Move,512> moveHistory;
         Bitboard pieces[12];
         Bitboard whitePieces;
         Bitboard blackPieces;
         Bitboard occupied;
-
+        
+        int ply=0;
         int sideToMove;
         int castlingRights;
         int enPassantSquare;

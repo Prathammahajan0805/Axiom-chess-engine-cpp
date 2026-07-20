@@ -6,12 +6,9 @@
 #include "bitboards.h"
 #include "board.h"
 
-struct Undo{
-    int enPassantSq;
-    int whiteKingSq;
-    int blackKingSq;
-    int castlingRights;
-};
 
-void makeMove(Board& board,MoveList& moveList);
+inline bool pinAllows(int pinnedSq,const checkInfo &info,int to){
+    return !(info.pinned & (1ULL<<pinnedSq)) || (info.pinRay[pinnedSq] & (1ULL<<to));
+}
+void makeMove(Board& board,Move& move);
 void unMakeMove(Board& board);
