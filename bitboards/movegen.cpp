@@ -158,7 +158,6 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
         attacks &=info.checkMask;
         promotion=attacks & promotionRank;
         attacks &= ~promotionRank;
-        enpassants &=info.checkMask;
         //normal attacks
         while(attacks){
             int to=popLSB(attacks);
@@ -180,11 +179,14 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
         //enpassants
         while(enpassants){
             int to=popLSB(enpassants);
+            int capturedSq = (color==WHITE) ? to-8 : to+8;
+            bool resolvesCheck = (info.checkMask & (1ULL<<to)) || (info.checkers & (1ULL<<capturedSq));
+
+            if(!resolvesCheck) continue;
             Piece p=board.pieceOn[color==WHITE?to-8:to+8];
             Bitboard occ=board.occupied;
             occ^=(1ULL<<sq);
             occ|=(1ULL<<to);
-            int capturedSq = (color == WHITE) ? to - 8 : to + 8;
             occ ^= (1ULL << capturedSq);
             if((getRookAttacks(myKingSq,occ) & enemyRooksQueens) || 
             (getBishopAttacks(myKingSq, occ) & enemyBishopsQueens)) continue;

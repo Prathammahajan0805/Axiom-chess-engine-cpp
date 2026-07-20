@@ -1,5 +1,6 @@
 #include "perft.h"
 #include "moves.h"
+#include <cstdint>
 
 uint64_t perft(Board& board, int depth) {
     if (depth == 0)
@@ -18,7 +19,7 @@ uint64_t perft(Board& board, int depth) {
     return nodes;
 }
 
-void perftRoot(Board& board, int depth) {
+uint64_t perftRoot(Board& board, int depth) {
     MoveList moves=generateMoves(board);
 
     uint64_t total = 0;
@@ -39,4 +40,5 @@ void perftRoot(Board& board, int depth) {
     }
 
     std::cout << "Nodes: " << total << '\n';
+    return total;
 }

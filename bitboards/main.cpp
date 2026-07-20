@@ -1,3 +1,4 @@
+#include <cstdint>
 #include<iostream>
 #include<chrono>
 #include"bitboards.h"
@@ -7,14 +8,10 @@ using namespace std;
 int main(){
     Board board;
     auto start = std::chrono::high_resolution_clock::now();
-    uint64_t nodes = perft(board, 6);
+    uint64_t nodes=perftRoot(board,7);
     auto end = std::chrono::high_resolution_clock::now();
-
     double seconds = std::chrono::duration<double>(end - start).count();
     double nps = seconds > 0.0 ? (double)nodes / seconds : 0.0;
-    cout<<"nodes = "<<nodes<<"\n";
-    cout<<"nps = "<<nps;
-    cout<<"\n seconds = "<<seconds;
-
+    cout<<"\n nps = "<<nps;
     return 0;
 }
