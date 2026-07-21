@@ -1,10 +1,11 @@
 #pragma once
 
+
 #include <cstdint>
 #include <iostream>
 #include <bitset>
 #include <string>
-
+#include "types.h"
 
 
 using Bitboard=uint64_t;
@@ -80,5 +81,5 @@ constexpr Bitboard RANK_8 = RANK_1 << (8 * 7);
 
 constexpr Bitboard NOT_FILE_A = ~(FILE_A);
 constexpr Bitboard NOT_FILE_H = ~(FILE_H);
-
-void displayBitboard(Bitboard bb);
+std::string pieceToUnicode(Piece piece);
+char pieceToChar(Piece piece);

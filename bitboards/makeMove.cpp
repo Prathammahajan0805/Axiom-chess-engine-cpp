@@ -2,6 +2,8 @@
 #include "bitboards.h"
 #include "board.h"
 #include "moves.h"
+#include "types.h"
+#include "zobrist.h"
 using namespace std;
 
 
@@ -9,20 +11,30 @@ using namespace std;
 void makeMove(Board &board, Move &move){
     board.moveHistory[board.ply]=move;
     board.history[board.ply++]={board.enPassantSquare,board.whiteKingSquare,
-        board.blackKingSquare,board.castlingRights};
+    board.blackKingSquare,board.castlingRights,board.hash};
     Color color=(Color) board.sideToMove;
     int myColOff=color*6;
+    if(board.enPassantSquare!=NO_SQUARE) board.hash ^= randomForEnPassant[board.enPassantSquare%8];
     board.enPassantSquare=NO_SQUARE;
+    int oldCastling=board.castlingRights;
 
     //common
-    
+    //get from to
     int from=getFrom(move);
     int to=getTo(move);
+    Piece piece=(Piece) getMovedPiece(move);
+    //update mailbox
     board.pieceOn[from]=NO_PIECE;
-    board.pieceOn[to]=(Piece) getMovedPiece(move);
+    board.pieceOn[to]=(Piece) piece;
+
+    //create a from to mask
     Bitboard fromToMask=(1ULL<<from);
     fromToMask |=(1ULL<<to);
-    board.pieces[getMovedPiece(move)] ^= fromToMask;
+    board.pieces[piece] ^= fromToMask;
+
+    //update zobrist hash
+    board.hash ^= randomForZobrist[piece][from]; //remove from
+    board.hash ^= randomForZobrist[piece][to]; //add to
     if(color==WHITE){
         board.whitePieces ^= fromToMask;
     }
@@ -41,6 +53,7 @@ void makeMove(Board &board, Move &move){
             board.blackPieces ^= (1ULL<<to);
         }
         board.occupied ^= (1ULL<<to);
+        board.hash ^= randomForZobrist[getCapturedPiece(move)][to];
         switch(to) {
             case A1:
                 board.castlingRights &= ~WHITE_QUEENSIDE;
@@ -60,7 +73,7 @@ void makeMove(Board &board, Move &move){
 
     //double pawn push
     if(isDoublePawnPush(move)){
-        if(getMovedPiece(move)==WP){
+        if(piece==WP){
             board.enPassantSquare=to-8;
         }
         else board.enPassantSquare=to+8;
@@ -70,10 +83,13 @@ void makeMove(Board &board, Move &move){
     Piece promotionP=(Piece) getPromotionPiece(move);
     if(promotionP!=NO_PIECE){
         setBit(board.pieces[promotionP],to);
-        board.pieces[getMovedPiece(move)] ^= (1ULL<<to);
+        board.pieces[piece] ^= (1ULL<<to);
         board.pieceOn[to]=promotionP;
-    }
 
+        board.hash ^= randomForZobrist[piece][to];
+        board.hash ^= randomForZobrist[promotionP][to];
+    }
+    
     //enpassant
     if(isEnPassant(move)){
         int pawnOn=(color==WHITE?to-8:to+8);
@@ -85,6 +101,7 @@ void makeMove(Board &board, Move &move){
         }
         board.occupied ^= (1ULL<<pawnOn);
         board.pieceOn[pawnOn]=NO_PIECE;
+        board.hash ^= randomForZobrist[getCapturedPiece(move)][pawnOn];
     }
 
     //castling
@@ -96,12 +113,18 @@ void makeMove(Board &board, Move &move){
             board.pieces[WR+myColOff] ^=rookFromTo;
             board.pieceOn[to+1]=NO_PIECE;
             board.pieceOn[to-1]=(Piece) (WR+myColOff);
+
+            board.hash ^= randomForZobrist[WR + myColOff][to + 1];
+            board.hash ^= randomForZobrist[WR + myColOff][to - 1];
         }else if(to==from-2){
             rookFromTo= (1ULL<< (to+1));
             rookFromTo |= (1ULL << (to-2));
             board.pieces[WR+myColOff] ^=rookFromTo;
             board.pieceOn[to-2]=NO_PIECE;
             board.pieceOn[to+1]=(Piece) (WR+myColOff);
+
+            board.hash ^= randomForZobrist[WR + myColOff][to - 2];
+            board.hash ^= randomForZobrist[WR + myColOff][to + 1];
         }
         if(color==WHITE){
             board.whitePieces ^=rookFromTo;
@@ -111,7 +134,7 @@ void makeMove(Board &board, Move &move){
         board.occupied ^=rookFromTo;
     }
     //remove castling rights
-    if(getMovedPiece(move)==WK+myColOff){
+    if(piece==WK+myColOff){
         if(color==WHITE){
             board.whiteKingSquare=to;
             board.castlingRights &= ~(WHITE_KINGSIDE | WHITE_QUEENSIDE);
@@ -122,7 +145,7 @@ void makeMove(Board &board, Move &move){
     }
 
     //remove castling rights for rook
-    if(getMovedPiece(move)==WR+myColOff){
+    if(piece==WR+myColOff){
         switch (from) {
             case A1: board.castlingRights &= ~WHITE_QUEENSIDE; break;
             case H1: board.castlingRights &= ~WHITE_KINGSIDE; break;
@@ -132,6 +155,12 @@ void makeMove(Board &board, Move &move){
     }
     
     board.sideToMove ^= 1;
+    if(oldCastling!=board.castlingRights){
+        board.hash ^=randomForCastling[oldCastling];
+        board.hash ^=randomForCastling[board.castlingRights];
+    }
+    if(board.enPassantSquare!=NO_SQUARE) board.hash ^= randomForEnPassant[board.enPassantSquare%8];
+    board.hash ^= randomForSide;
 }
 
 void unMakeMove(Board &board){
@@ -143,11 +172,10 @@ void unMakeMove(Board &board){
     board.castlingRights=undo.castlingRights;
     board.blackKingSquare=undo.blackKingSq;
     board.whiteKingSquare=undo.whiteKingSq;
+    board.hash=undo.hash;
 
     Color color=(Color)( board.sideToMove ^ 1);
     int myColOff=color*6;
-    Color opponentCol=(Color) (color ^ 1);
-    int opponentOff=opponentCol*6;
 
     //common
     int from=getFrom(move);

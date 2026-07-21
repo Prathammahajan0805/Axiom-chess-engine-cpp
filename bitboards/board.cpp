@@ -1,6 +1,7 @@
 #include"board.h"
 #include "attacks.h"
 #include"bitboards.h"
+#include "zobrist.h"
 #include<sstream>
 using namespace std;
 
@@ -16,24 +17,7 @@ int charToPiece(char c){
     }
     return 0;
 }
-char pieceToChar(Piece piece){
-    switch(piece){
-        case WP: return 'P';break;
-        case WB: return 'B';break;
-        case WN: return 'N';break;
-        case WR: return 'R';break;
-        case WQ: return 'Q';break;
-        case WK: return 'K';break;
-        case BP: return 'p';break;
-        case BB: return 'b';break;
-        case BN: return 'n';break;
-        case BR: return 'r';break;
-        case BQ: return 'q';break;
-        case BK: return 'k';break;
-        case NO_PIECE: return '\0';break;
-    }
-    return '\0';
-}
+
 
 void Board::clearBoard() {
     for (int i = 0; i < 12; i++)
@@ -126,14 +110,70 @@ void Board::loadFEN(const string& fen) {
         }
         updateOccupancies();
 }
-void Board::print() const{
-    displayBitboard(occupied);
+void Board::print(Bitboard bb) const{
+    string s="\n  --------------------------------\n";
+    for (int rank = RANKV_8; rank >= RANKV_1; rank--) {
+        for (int file = FILEV_A; file <= FILEV_H; file++) {
+            if(file==FILEV_A) s+=to_string(rank+1)+" ";
+            if(getBit(bb, getSquare(file, rank))) s+= "| "+pieceToUnicode((Piece) pieceOn[getSquare(file, rank)])+" ";
+            else s+="|   ";
+        }
+        s+="| \n  --------------------------------\n";
+        
+    }
+    s+="    a   b   c   d   e   f   g   h \n";
+    cout<<s;
+    }
+    string squareToString(int sq){
+    string s="";
+    int rank=sq/8;
+    int file=sq%8;
+    s+=static_cast<char>(file+'a');
+    s+=to_string(rank+1);
+    return s;
+}
+
+string Board::toFEN() const {
+        string fen = "";
+        
+        for (int rank = 7; rank >= 0; rank--) {
+            int emptyCount = 0;
+            
+            for (int file = 0; file < 8; file++) {
+                Piece piece = pieceOn[getSquare(file, rank)];
+                
+                if (piece == NO_PIECE) {
+                    emptyCount++;
+                } else {
+                    if (emptyCount > 0) {
+                        fen += to_string(emptyCount);
+                        emptyCount = 0;
+                    }
+                    
+                    char p = pieceToChar(piece);
+                    if (piece>=WP && piece<=WK) {
+                        p = toupper(p);
+                    }
+                    fen += p;
+                }
+            }
+            
+            if (emptyCount > 0) {
+                fen += to_string(emptyCount);
+            }
+            
+            if (rank > 0) fen += '/';
+        }
+        
+        return fen;
 }
 Board::Board(){
     pieceOn.fill(NO_PIECE);
+    hash=0ULL;
     loadFEN(startingFen);
     initLeaperAttacks();
     initLineBetween();
     initAllSliderAttacks();
     initShifts();
+    initZobrist();
 }
