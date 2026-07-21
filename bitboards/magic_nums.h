@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint> 
+
+
 const uint64_t rookMagicNumbers[64] = {
 0xa080004000201880ULL,
 0x0840100040002000ULL,
