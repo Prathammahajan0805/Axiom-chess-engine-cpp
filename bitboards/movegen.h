@@ -5,6 +5,7 @@
 #include "board.h"
 #include "moves.h"
 #include "attacks.h"
+#include "types.h"
 struct MoveList{
     Move moves[256];
     int count=0;
@@ -15,10 +16,15 @@ struct checkInfo{
     Bitboard pinned;
     Bitboard pinRay[64];
 };
-void generateCheckersAndPins(Board &board,checkInfo &info);
-void generatePawnMoves(MoveList& createMove,Board& board,Color color,checkInfo& info);
-void generateKnightMoves(MoveList& createMove,checkInfo& info,Board& board);
-void generateKingMoves(MoveList& createMove,checkInfo& info,Board& board);
-void generateSlidingPieces(MoveList& createMove,Piece piece,checkInfo& info,Board& board);
+void generateCheckersAndPins(const Board &board,checkInfo &info);
+template<GenType Type>
+void generatePawnMoves(MoveList& createMove,const Board& board,Color color,checkInfo& info);
+template<GenType Type>
+void generateKnightMoves(MoveList& createMove,checkInfo& info,const Board& board);
+template<GenType Type>
+void generateKingMoves(MoveList& createMove,checkInfo& info,const Board& board);
+template<GenType Type>
+void generateSlidingPieces(MoveList& createMove,Piece piece,checkInfo& info,const Board& board);
 bool isSquareAttacked(int sq,Color attacker,Bitboard occupied,const Board& board);
-MoveList generateMoves(Board& board);
+template<GenType Type>
+MoveList generateMoves(const Board& board);

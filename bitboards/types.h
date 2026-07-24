@@ -35,3 +35,10 @@ enum Castling : int {
     BLACK_KINGSIDE  = 4,
     BLACK_QUEENSIDE = 8
 };
+
+enum GenType{
+    ALL,
+    CAPTURES,
+    QUITE
+};
+inline Color pieceColor(Piece piece){return piece>=6?BLACK:WHITE; }

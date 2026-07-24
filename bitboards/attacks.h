@@ -7,6 +7,11 @@
 #include <cstring>
 
 extern Bitboard pawnAttacks[2][64];
+extern Bitboard pawnSplatsForward[64];
+extern Bitboard pawnSplatsBackward[64];
+extern Bitboard whitePawnPassedMask[64];
+extern Bitboard blackPawnPassedMask[64];
+extern Bitboard adjacentFileMasks[8];
 extern Bitboard knightAttacks[64];
 extern Bitboard kingAttacks[64];
 extern Bitboard bishopAttacksMask[64];
@@ -17,7 +22,7 @@ extern int bishopShifts[64];
 extern Bitboard bishopAttacks[64][512];
 extern Bitboard line[64][64];
 extern Bitboard between[64][64];
-
+extern Bitboard fileMasks[8];
 void initLineBetween();
 void initLeaperAttacks();
 void initBishopReleventOccupancyMask();
@@ -25,7 +30,22 @@ void initRookReleventOccupancyMask();
 void initSliderAttacks(bool isBishop);
 void initAllSliderAttacks();
 void initShifts();
+void initSplats();
+void initPassedPawnsMask();
+void initFileMasks();
 
+inline Bitboard northFill(Bitboard bb){
+    bb |= (bb <<  8);
+    bb |= (bb << 16);
+    bb |= (bb << 32);
+    return bb;
+}
+inline Bitboard southFill(Bitboard bb){
+    bb |= (bb >>  8);
+    bb |= (bb >> 16);
+    bb |= (bb >> 32);
+    return bb;  
+}
 inline Bitboard getRookAttacks(int sq,Bitboard occupancy){
     Bitboard index=magicIndex(occupancy,rookMagicNumbers[sq],64-rookShifts[sq],rookAttacksMask[sq]);
     return rookAttacks[sq][index];

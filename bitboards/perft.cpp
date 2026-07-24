@@ -1,11 +1,12 @@
 #include "perft.h"
 #include "moves.h"
+#include "types.h"
 #include <cstdint>
 
 uint64_t perft(Board& board, int depth) {
     if (depth == 0)
         return 1;
-    MoveList moves=generateMoves( board);
+    MoveList moves=generateMoves<ALL>( board);
     if (depth == 1) return moves.count;
 
     uint64_t nodes = 0;
@@ -20,7 +21,7 @@ uint64_t perft(Board& board, int depth) {
 }
 
 uint64_t perftRoot(Board& board, int depth) {
-    MoveList moves=generateMoves(board);
+    MoveList moves=generateMoves<ALL>(board);
 
     uint64_t total = 0;
 

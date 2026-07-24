@@ -2,6 +2,7 @@
 #include "attacks.h"
 #include"bitboards.h"
 #include "zobrist.h"
+#include"evaluation.h"
 #include<sstream>
 using namespace std;
 
@@ -176,4 +177,8 @@ Board::Board(){
     initAllSliderAttacks();
     initShifts();
     initZobrist();
+    initEval();
+    initSplats();
+    initPassedPawnsMask();
+    initFileMasks();
 }

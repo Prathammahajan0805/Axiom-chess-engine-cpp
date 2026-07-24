@@ -8,7 +8,7 @@ using namespace std;
 
 
 
-void makeMove(Board &board, Move &move){
+void makeMove(Board &board,Move &move){
     board.moveHistory[board.ply]=move;
     board.history[board.ply++]={board.enPassantSquare,board.whiteKingSquare,
     board.blackKingSquare,board.castlingRights,board.hash};

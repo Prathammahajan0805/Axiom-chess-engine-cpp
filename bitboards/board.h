@@ -29,7 +29,6 @@ class Board{
         int whiteKingSquare;
         int blackKingSquare;
 
-
         Board();
 
         inline void updateOccupancies(){

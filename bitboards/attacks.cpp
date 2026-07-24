@@ -2,9 +2,24 @@
 #include "bitboards.h"
 #include "board.h"
 #include "magic.h"
+#include "types.h"
 #include <cstdint>
+Bitboard fileMasks[8]={
+    FILE_A,
+    FILE_B,
+    FILE_C,
+    FILE_D,
+    FILE_E,
+    FILE_F,
+    FILE_G,
+    FILE_H,
+};
 
 Bitboard pawnAttacks[2][64];
+Bitboard pawnSplatsForward[64];
+Bitboard pawnSplatsBackward[64];
+Bitboard whitePawnPassedMask[64];
+Bitboard blackPawnPassedMask[64];
 Bitboard knightAttacks[64];
 Bitboard kingAttacks[64];
 Bitboard bishopAttacksMask[64];
@@ -13,9 +28,19 @@ Bitboard rookAttacks[64][4096];
 Bitboard bishopAttacks[64][512];
 Bitboard line[64][64];
 Bitboard between[64][64];
+Bitboard adjacentFileMasks[8];
+
 int rookShifts[64];
 int bishopShifts[64];
-
+void initFileMasks(){
+    for(int file=FILEV_A;file<=FILEV_H;file++){
+        Bitboard Mask=0ULL;
+        if(file>FILEV_A) Mask |= fileMasks[file-1];
+        if(file<FILEV_H) Mask |= fileMasks[file+1];
+        adjacentFileMasks[file]=Mask;
+    }
+    
+}
 void initShifts(){
     for(int i=0;i<64;i++){
         rookShifts[i]=popCount(rookAttacksMask[i]);
@@ -42,7 +67,7 @@ static Bitboard maskPawnAttacks(Color col,int sq){
     int rank=sq/8;
     int file=sq%8;
     Bitboard attacks = 0ULL;
-    int dir = (col == WHITE) ? 1 : -1;
+    int dir = (col == BLACK) ? -1 : 1;
 
     constexpr int df[2] = {-1, 1};
 
@@ -261,3 +286,20 @@ void initLineBetween(){
     }
 }
 
+void initSplats(){
+    for(int sq=0;sq<64;sq++){
+        pawnSplatsForward[sq]=northFill((1ULL<<sq));
+        pawnSplatsBackward[sq]=southFill((1ULL<<sq));
+    }
+}
+
+void initPassedPawnsMask(){
+    for(int sq=0;sq<64;sq++){
+        whitePawnPassedMask[sq]=pawnSplatsForward[sq];
+        whitePawnPassedMask[sq] |= (whitePawnPassedMask[sq] & ~FILE_H)<<1ULL;
+        whitePawnPassedMask[sq] |= (whitePawnPassedMask[sq]&~FILE_A)>>1ULL ;
+        blackPawnPassedMask[sq]=pawnSplatsBackward[sq];
+        blackPawnPassedMask[sq] |= (blackPawnPassedMask[sq] & ~FILE_H)<<1ULL;
+        blackPawnPassedMask[sq] |= (blackPawnPassedMask[sq]&~FILE_A)>>1ULL ;
+    }
+}

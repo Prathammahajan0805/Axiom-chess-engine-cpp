@@ -1,3 +1,4 @@
+
 #include<iostream>
 #include"movegen.h"
 #include "attacks.h"
@@ -5,32 +6,35 @@
 #include "board.h"
 #include "makeMove.h"
 #include "moves.h"
+#include "types.h"
 
 
 //generate all moves
-MoveList generateMoves(Board &board){
+template<GenType Type>
+MoveList generateMoves(const Board &board){
     MoveList createMove;
     int start=board.sideToMove==WHITE? WP:BP;
     int end=board.sideToMove==WHITE?WK:BK;
     checkInfo info;
     generateCheckersAndPins(board,info);
     if(popCount(info.checkers)>=2){
-        generateKingMoves(createMove, info,board);
+        generateKingMoves<Type>(createMove, info,board);
         return createMove;
     }
     for(int i=start;i<=end;i++){
         switch (i%6) {
-            case WP:generatePawnMoves( createMove,board, (Color) board.sideToMove,info); break;
-            case WN:generateKnightMoves( createMove,info,board); break;
-            case WK:generateKingMoves(createMove,info,board);break;
-            default:generateSlidingPieces(createMove,(Piece) i,info,board);break;
+            case WP:generatePawnMoves<Type>( createMove,board, (Color) board.sideToMove,info); break;
+            case WN:generateKnightMoves<Type>( createMove,info,board); break;
+            case WK:generateKingMoves<Type>(createMove,info,board);break;
+            default:generateSlidingPieces<Type>(createMove,(Piece) i,info,board);break;
         }
     }
     return createMove;
 }
 
 //generate checkers and pins
-void generateCheckersAndPins(Board &board, checkInfo &info){
+
+void generateCheckersAndPins(const Board &board, checkInfo &info){
     int sq=board.sideToMove==WHITE?board.whiteKingSquare:board.blackKingSquare;
     Bitboard ownPieces=board.sideToMove==WHITE?board.whitePieces:board.blackPieces;
     Color opponentColor=board.sideToMove==WHITE?BLACK:WHITE;
@@ -97,7 +101,8 @@ void generateCheckersAndPins(Board &board, checkInfo &info){
         }
     }
 }
-void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInfo &info){
+template <GenType Type>
+void generatePawnMoves(MoveList &createMove, const Board &board, Color color, checkInfo &info){
     Color opponentColor=color==WHITE?BLACK:WHITE;
     Bitboard opponents = color==WHITE? board.blackPieces:board.whitePieces;
     int myColOffset=color*6;
@@ -122,6 +127,7 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
     Bitboard promotion = single & promotionRank;
     single &= ~promotionRank;
     dblPush &=info.checkMask;
+    if constexpr (Type==ALL || Type==QUITE){
 
     while(single){
         int to=popLSB(single);
@@ -146,7 +152,8 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
         }
         }   
     }
-
+    }
+    if constexpr (Type==ALL||Type== CAPTURES){
     //capturing moves
     Bitboard pawns=board.pieces[WP+myColOffset];
     
@@ -192,12 +199,12 @@ void generatePawnMoves(MoveList &createMove, Board &board, Color color, checkInf
             (getBishopAttacks(myKingSq, occ) & enemyBishopsQueens)) continue;
             if(pinAllows(sq,info,to)) createMove.moves[createMove.count++]=addMove(sq, to,WP+myColOffset,p,NO_PIECE,true,false,true);
         }
-        
+        }
     }
     
 }
-
-void generateKnightMoves(MoveList &createMove, checkInfo &info,Board &board){
+template <GenType Type>
+void generateKnightMoves(MoveList &createMove, checkInfo &info,const Board &board){
     Color color=(Color) board.sideToMove;
     int myColOff=color*6;
     Color opponentColor=color==WHITE?BLACK:WHITE;
@@ -211,28 +218,30 @@ void generateKnightMoves(MoveList &createMove, checkInfo &info,Board &board){
 
         Bitboard moves=knightAttacks[sq] & ~(myPieces);
 
-        Bitboard silent=moves & ~(opponentPieces);
-        Bitboard captures = moves & opponentPieces;
-
-        silent &= info.checkMask;
-        captures &= info.checkMask;
-
+        if constexpr (Type==ALL || Type ==QUITE){
         //silent moves
+        Bitboard silent=moves & ~(opponentPieces);
+        silent &= info.checkMask;
         while(silent){
             int to=popLSB(silent);
             createMove.moves[createMove.count++]=addMove(sq, to,WN+myColOff);
         }
+        }
 
         //capture moves
+        if constexpr(Type==ALL || Type==CAPTURES){
+        Bitboard captures = moves & opponentPieces;
+        captures &= info.checkMask;
         while(captures){
             int to = popLSB(captures);
             int capturedPiece=board.pieceOn[to];
             createMove.moves[createMove.count++]=addMove(sq, to,WN+myColOff,capturedPiece,NO_PIECE,true);
         }
+        }
     }
 }
-
-void generateKingMoves(MoveList &createMove, checkInfo &info,Board& board){
+template <GenType Type>
+void generateKingMoves(MoveList &createMove, checkInfo &info,const Board& board){
     Color color=(Color) board.sideToMove;
     Color attacker=(Color)(color^1);
     int myColOff=color*6;
@@ -245,10 +254,10 @@ void generateKingMoves(MoveList &createMove, checkInfo &info,Board& board){
         int sq=popLSB(king);
         Bitboard moves=kingAttacks[sq] & ~ownPieces;
 
-        Bitboard silent=moves & ~(enemyPieces);
-        Bitboard captures=moves & enemyPieces;
-
+        
         //silent moves
+        if constexpr (Type==ALL || Type==QUITE){
+        Bitboard silent=moves & ~(enemyPieces);
         while(silent){
             int to =popLSB(silent);
             Bitboard occ = board.occupied;
@@ -258,14 +267,17 @@ void generateKingMoves(MoveList &createMove, checkInfo &info,Board& board){
                 createMove.moves[createMove.count++]=addMove(sq, to,WK+myColOff);
             }
         }
-
+        }
         //capture moves
+        if constexpr (Type == ALL || Type==CAPTURES){
+        Bitboard captures=moves & enemyPieces;
         while(captures){
             int to =popLSB(captures);
             int capturePiece=board.pieceOn[to];
             if(!isSquareAttacked(to, attacker,board.occupied^(1ULL<<sq),board)){
                 createMove.moves[createMove.count++]=addMove(sq, to,WK+myColOff,capturePiece,NO_PIECE,true);
             }
+        }
         }
         if (isSquareAttacked(sq, attacker, board.occupied, board))
             return;
@@ -295,8 +307,8 @@ void generateKingMoves(MoveList &createMove, checkInfo &info,Board& board){
         }
     }   
 }
-
-void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,Board& board){
+template <GenType Type>
+void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,const Board& board){
     Color color=(Color) board.sideToMove;
     int myOff=color*6;
     bool isRook = (piece==WR+myOff || piece==WQ+myOff);
@@ -311,22 +323,24 @@ void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,Bo
 
             moves &=info.checkMask;
 
+            if constexpr (Type==ALL || Type== QUITE){
             Bitboard silent=moves & ~enemyPieces;
-            Bitboard captures=moves & enemyPieces;
-
             while(silent){
                 int to=popLSB(silent);
                 if(pinAllows(sq,info,to)){
                     createMove.moves[createMove.count++]=addMove(sq, to,piece);
                 }
             }
-
+            }
+            if constexpr (Type==ALL || Type==CAPTURES){
+            Bitboard captures=moves & enemyPieces;
             while(captures){
                 int to = popLSB(captures);
                 Piece capturePiece=board.pieceOn[to];
                 if(pinAllows(sq,info,to)){
                     createMove.moves[createMove.count++]=addMove(sq, to,piece,capturePiece,NO_PIECE,true);
                 }
+            }
             }
         }
     }
@@ -338,16 +352,17 @@ void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,Bo
 
             moves &=info.checkMask;
 
-            Bitboard silent=moves & ~enemyPieces;
-            Bitboard captures=moves & enemyPieces;
-
-            while(silent){
-                int to=popLSB(silent);
-                if(pinAllows(sq,info,to)){
-                    createMove.moves[createMove.count++]=addMove(sq, to,piece);
+            if constexpr (Type==ALL || Type== QUITE){
+                Bitboard silent=moves & ~enemyPieces;
+                while(silent){
+                    int to=popLSB(silent);
+                    if(pinAllows(sq,info,to)){
+                        createMove.moves[createMove.count++]=addMove(sq, to,piece);
+                    }
                 }
             }
-
+            if constexpr (Type==ALL || Type== CAPTURES){
+            Bitboard captures=moves & enemyPieces;
             while(captures){
                 int to = popLSB(captures);
                 Piece capturePiece=board.pieceOn[to];
@@ -355,10 +370,10 @@ void generateSlidingPieces(MoveList &createMove, Piece piece, checkInfo &info,Bo
                     createMove.moves[createMove.count++]=addMove(sq, to,piece,capturePiece,NO_PIECE,true);
                 }
             }
+            }
         }
     }
 }
-
 bool isSquareAttacked(int sq, Color attacker,Bitboard occupied, const Board& board) {
     int off = attacker * 6;
     Color mycol=(Color)(attacker^1);
@@ -381,3 +396,6 @@ bool isSquareAttacked(int sq, Color attacker,Bitboard occupied, const Board& boa
 
     return false;
 }
+template MoveList generateMoves<ALL>(const Board&);
+template MoveList generateMoves<CAPTURES>(const Board&);
+template MoveList generateMoves<QUITE>(const Board&);
