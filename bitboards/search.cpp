@@ -142,12 +142,12 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         else scores[i]=scoreMove(moveList.moves[i],ply);
     }
     bool isCheck=isInCheck((Color) board.sideToMove, board);
-    
+
     //nullmove pruning
-    if(depth>=3 && !isCheck && hasNonePawnPieces(board)){
+    if(depth>=3 && ply!=0 && !isCheck && hasNonePawnPieces(board) && beta<MATE_SCORE-1000){
         makeNullMove(board);
         int R=2+depth/4;
-        int score=-search(board,  depth-1-R,  ply+1,-beta,-alpha,rootBestMove);
+        int score=-search(board,  depth-1-R,  ply+1,-beta,-beta+1,rootBestMove);
         unmakeNullMove(board);
         if(score>=beta) return beta;
     }
@@ -170,14 +170,33 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
 
         //evaluate
         makeMove(board,move);
-        int score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
+        int score;
+        if(i==0){
+            score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
+        }else{
+            int newDepth=depth-1;
+            bool neededScan=true;
+            if(depth>=3 && i>=3 && getCapturedPiece(move)==NO_PIECE && !isCheck){
+                int red=1+(i>6?1:0);
+                int reducedDepth=std::max(newDepth-red,0);
+
+                score=-search(board, reducedDepth,ply+1,-alpha-1,-alpha,rootBestMove);
+                neededScan=score>alpha;
+            }
+            if(neededScan){
+                score=-search(board, depth-1,ply+1,-alpha-1,-alpha,rootBestMove);
+                if(score>alpha && score<beta){
+                    score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
+                }
+            }
+        }
+        unMakeMove(board);
         if(score > bestScore){
             bestScore = score;
             bestMove=move;
         }
         if(score > alpha)
             alpha = score;
-        unMakeMove(board);
         //alpha-beta pruning
         if(alpha>=beta){
             //update killer moves

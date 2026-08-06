@@ -21,7 +21,7 @@ struct Move{
 inline Move addMove(uint32_t from,
     uint32_t to,
     uint32_t movedPiece,
-    uint32_t capturePiece=0,
+    uint32_t capturePiece=NO_PIECE,
     uint32_t promotionPiece=NO_PIECE,
     bool isCapture=false,
     bool isDoublePawnPush=false,

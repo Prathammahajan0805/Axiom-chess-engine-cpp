@@ -140,7 +140,7 @@ void generatePawnMoves(MoveList &createMove, const Board &board, Color color, ch
         int to=popLSB(dblPush);
         int from= color==WHITE? to-16:to+16;
         if((pinAllows(from,info, to))){
-            createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset,0,NO_PIECE,false,true);
+            createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset,NO_PIECE,NO_PIECE,false,true);
         }
     }
     while(promotion){
@@ -148,7 +148,7 @@ void generatePawnMoves(MoveList &createMove, const Board &board, Color color, ch
         int from=color==WHITE?to-8:to+8;
         if (pinAllows(from,info,to)) {
         for(int i=WN+myColOffset;i<=WQ+myColOffset;i++){
-            createMove.moves[createMove.count++]=addMove(from, to, WP+myColOffset,0,i);
+            createMove.moves[createMove.count++]=addMove(from, to, WP+myColOffset,NO_PIECE,i);
         }
         }   
     }
@@ -286,7 +286,7 @@ void generateKingMoves(MoveList &createMove, checkInfo &info,const Board& board)
             createMove.moves[createMove.count++]=addMove(sq, 
                 to, 
                 WK+myColOff,
-                0,
+                NO_PIECE,
                 NO_PIECE,
                 false,
                 false,
@@ -298,7 +298,7 @@ void generateKingMoves(MoveList &createMove, checkInfo &info,const Board& board)
             createMove.moves[createMove.count++]=addMove(sq, 
                 to, 
                 WK+myColOff,
-                0,
+                NO_PIECE,
                 NO_PIECE,
                 false,
                 false,
