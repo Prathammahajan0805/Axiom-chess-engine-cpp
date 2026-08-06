@@ -41,4 +41,10 @@ enum GenType{
     CAPTURES,
     QUITE
 };
+
+enum TTFlag{
+    EXACT,
+    LOWERBOUND,
+    UPPERBOUND
+};
 inline Color pieceColor(Piece piece){return piece>=6?BLACK:WHITE; }

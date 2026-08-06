@@ -1,7 +1,7 @@
 #include "attacks.h"
 #include "bitboards.h"
 #include "board.h"
-#include"evalualtion.h"
+#include"evaluation.h"
 #include "types.h"
 #include<array>
 std::array<const int,12> gamephaseInc={0,1,1,2,4,0,0,1,1,2,4,0};

@@ -252,3 +252,20 @@ void unMakeMove(Board &board){
 
     board.sideToMove ^= 1;
 }
+void makeNullMove(Board &board){
+    Undo& undo=board.history[board.ply++];
+    undo.hash=board.hash;
+    undo.enPassantSq=board.enPassantSquare;
+    if(board.enPassantSquare!=NO_SQUARE){
+        board.hash^=randomForEnPassant[board.enPassantSquare%8];
+        board.enPassantSquare=NO_SQUARE;
+    }
+    board.hash^=randomForSide;
+    board.sideToMove^=1;
+}
+void unmakeNullMove(Board &board){
+    Undo& undo=board.history[--board.ply];
+    board.enPassantSquare=undo.enPassantSq;
+    board.hash=undo.hash;
+    board.sideToMove^=1;
+}

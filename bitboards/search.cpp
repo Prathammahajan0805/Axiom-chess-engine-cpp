@@ -1,4 +1,5 @@
 #include"search.h"
+#include "TT.h"
 #include "board.h"
 #include "evaluation.h"
 #include "makeMove.h"
@@ -10,6 +11,7 @@
 #include <cstdint>
 constexpr int INF=32000;
 constexpr int PROMOTION_PRIOR=10000;
+constexpr int TTMOVE_SCORE=100000;
 namespace search_name {
     std::array<std::array<Move,2>,200> killer;
 }
@@ -39,43 +41,33 @@ int scoreMove(const Move &move,int ply){
     }
     return score;
 }
-// int quiescence(Board &board,int alpha,int beta,int ply){
-//     nodes++;
-//     int standPat=eval(board);
-//     if(standPat>=beta){
-//         return beta;
-//     }
-//     if(standPat>alpha){
-//         alpha=standPat;
-//     }
-// }
-Move findBestMove(Board &board, int depth){
-    MoveList moveList=generateMoves<ALL>(board);//get moves
-    nodes=0;
-
-    //initialise best move
-    Move bestMove={0};
-
-    //initialize killer moves
-    search_name::killer.fill({0,0});
-
-    //initialize best score
-    int bestScore=INT_MIN;
-
-    //checkmate detection
-    if(moveList.count==0){
-        int sq=(board.sideToMove==WHITE?board.whiteKingSquare:board.blackKingSquare);
-        if(isSquareAttacked(sq,(Color) (board.sideToMove^1),board.occupied,board)){
-            return (Move){0};
-        }else{
-            return (Move){1u << 31};
+int quiescence(Board &board,int alpha,int beta,int ply){
+    nodes++;
+    
+    MoveList moveList=isInCheck((Color) board.sideToMove,board)?generateMoves<ALL>(board):generateMoves<CAPTURES>(board);
+    bool inCheck=isInCheck((Color) board.sideToMove,board);
+    if(!inCheck){
+        int standPat=eval(board);
+        if(standPat>=beta){
+            return beta;
+        }
+        if(standPat>alpha){
+            alpha=standPat;
         }
     }
+    //get capture only moves
+    if(moveList.count==0){
+        if(inCheck){
+            return -MATE_SCORE+ply;
+        }else{
+            return alpha;
+        }
+    }
+    //get scores
+    std::array<int,256> scores;
+    for(int i=0;i<moveList.count;i++) scores[i]=getCaptureScore(moveList.moves[i]);
 
-    //scores
-    std::array<int,512> scores;
-    for(int i=0;i<moveList.count;i++) scores[i]=scoreMove(moveList.moves[i],0);
-
+    //start quiescence search
     for(int i=0;i<moveList.count;i++){
         int maxScoreMove=scores[i],ind=i;
 
@@ -89,37 +81,54 @@ Move findBestMove(Board &board, int depth){
 
         //swap according to priorities
         std::swap(moveList.moves[i],moveList.moves[ind]);
-        std::swap(scores[i],scores[ind]);  
-        
-        //find best move
-        Move &move=moveList.moves[i];
-        makeMove(board,move);
+        std::swap(scores[i],scores[ind]);
 
-        //eval for next position
-        int score=-search(board, depth-1,1,-INF,INF);
-
-        //update scores and moves
-        if(bestScore<score){
-            bestScore=score;
-            bestMove=move;
-        }
+        makeMove(board,moveList.moves[i]);
+        int score=-quiescence(board,-beta,-alpha, ply+1);
         unMakeMove(board);
+        if(score>=beta) return beta;
+        if(score>alpha) alpha=score;
+    }
+    return alpha;
+}
+Move findBestMove(Board &board, int maxDepth){
+    nodes=0;
+    Move bestMove={0};
+    int bestScore=0;
+    //iterative deepening
+    for(int depth=1;depth<=maxDepth;depth++){
+        Move rootBestMove={0};
+        int score=search(board,depth, 0,-INF,INF,rootBestMove);
+        bestMove=rootBestMove;
+        bestScore=score;
     }
     return bestMove;
 }
-
-int search(Board &board,int depth,int ply,int alpha,int beta){
+int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove){
     nodes++;
-    if(depth==0) return eval(board);
 
+    //quiescence search
+    if(depth==0) return quiescence(board, alpha,  beta, ply);
+    Move bestMove={0};
+    //get ttmove
+    TTEntry* entry=probe(board.hash);
+    Move ttMove={0};
+    if(entry){
+        ttMove=entry->bestMove;
+        if(entry->depth>=depth && ply!=0){
+            if(entry->flag==EXACT) return entry->score;
+            if(entry->flag==LOWERBOUND) alpha=std::max(alpha,entry->score);
+            if(entry->flag==UPPERBOUND) beta=std::min(beta,entry->score);
+            if(alpha>=beta) return entry->score;
+        }
+    }
     //generate moves
     MoveList moveList=generateMoves<ALL>(board);
     int bestScore=INT_MIN;
 
     //checkmate detection
     if(moveList.count==0){
-        int sq=(board.sideToMove==WHITE?board.whiteKingSquare:board.blackKingSquare);
-        if(isSquareAttacked(sq,(Color) (board.sideToMove^1),board.occupied,board)){
+        if(isInCheck((Color)board.sideToMove,board)){
             return -MATE_SCORE+ply;
         }else{
             return DRAW_SCORE;
@@ -128,9 +137,23 @@ int search(Board &board,int depth,int ply,int alpha,int beta){
 
     //initialize scores
     std::array<int,256> scores;
-    for(int i=0;i<moveList.count;i++) scores[i]=scoreMove(moveList.moves[i],ply);
+    for(int i=0;i<moveList.count;i++){ 
+        if(moveList.moves[i].moveInfo==ttMove.moveInfo) scores[i]=TTMOVE_SCORE;
+        else scores[i]=scoreMove(moveList.moves[i],ply);
+    }
+    bool isCheck=isInCheck((Color) board.sideToMove, board);
+    
+    //nullmove pruning
+    if(depth>=3 && !isCheck && hasNonePawnPieces(board)){
+        makeNullMove(board);
+        int R=2+depth/4;
+        int score=-search(board,  depth-1-R,  ply+1,-beta,-alpha,rootBestMove);
+        unmakeNullMove(board);
+        if(score>=beta) return beta;
+    }
 
     //search
+    int origAlpha=alpha;
     for(int i=0;i<moveList.count;i++){
         int maxScoreMove=scores[i],ind=i;
 
@@ -147,14 +170,14 @@ int search(Board &board,int depth,int ply,int alpha,int beta){
 
         //evaluate
         makeMove(board,move);
-        int score=-search(board, depth-1,ply+1,-beta,-alpha);
-        if(score > bestScore)
+        int score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
+        if(score > bestScore){
             bestScore = score;
-
+            bestMove=move;
+        }
         if(score > alpha)
             alpha = score;
         unMakeMove(board);
-
         //alpha-beta pruning
         if(alpha>=beta){
             //update killer moves
@@ -168,7 +191,20 @@ int search(Board &board,int depth,int ply,int alpha,int beta){
             }
             break;
         }
+        
+        //tt flag choosing
     }
+        TTFlag flag;
+        if(bestScore<=origAlpha){
+            flag=UPPERBOUND;
+        }
+        else if(bestScore>=beta){
+            flag=LOWERBOUND;
+        }else flag=EXACT;
+
+        //store in ttentry
+        store(board.hash, bestMove,  depth, bestScore, flag);
+        if(ply==0)rootBestMove=bestMove;
     
     return bestScore;
 }

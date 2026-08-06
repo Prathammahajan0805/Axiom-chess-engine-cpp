@@ -1,5 +1,5 @@
 #pragma once
-#include"Bitboards.h"
+#include"bitboards.h"
 #include"board.h"
 #include"types.h"
 #include"makeMove.h"
@@ -7,5 +7,5 @@
 #include"evaluation.h"
 
 Move findBestMove(Board &board,int depth);
-int search(Board& board,int depth,int ply,int alpha,int beta);
+int search(Board& board,int depth,int ply,int alpha,int beta,Move& rootBestMove);
 uint64_t getNodes();

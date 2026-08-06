@@ -28,3 +28,5 @@ void generateSlidingPieces(MoveList& createMove,Piece piece,checkInfo& info,cons
 bool isSquareAttacked(int sq,Color attacker,Bitboard occupied,const Board& board);
 template<GenType Type>
 MoveList generateMoves(const Board& board);
+bool isInCheck(Color color,const Board& board);
+bool hasNonePawnPieces(const Board &board);

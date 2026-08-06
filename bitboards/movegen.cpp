@@ -396,6 +396,14 @@ bool isSquareAttacked(int sq, Color attacker,Bitboard occupied, const Board& boa
 
     return false;
 }
+bool isInCheck(Color color,const Board& board){
+    int sq=(color==WHITE?board.whiteKingSquare:board.blackKingSquare);
+    return isSquareAttacked(sq,(Color) (color^1),board.occupied,board);
+}
+bool hasNonePawnPieces(const Board &board){
+    int offset=board.sideToMove==WHITE?0:6;
+    return (board.pieces[WR+offset] | board.pieces[WR+offset] | board.pieces[WN+offset] | board.pieces[WB+offset])!=0;
+}
 template MoveList generateMoves<ALL>(const Board&);
 template MoveList generateMoves<CAPTURES>(const Board&);
 template MoveList generateMoves<QUITE>(const Board&);

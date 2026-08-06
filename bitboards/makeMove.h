@@ -12,3 +12,5 @@ inline bool pinAllows(int pinnedSq,const checkInfo &info,int to){
 }
 void makeMove(Board& board,Move& move);
 void unMakeMove(Board& board);
+void makeNullMove(Board& board);
+void unmakeNullMove(Board& board);
