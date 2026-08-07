@@ -9,12 +9,20 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include<chrono>
 constexpr int INF=32000;
 constexpr int PROMOTION_PRIOR=10000;
 constexpr int TTMOVE_SCORE=100000;
+constexpr int MAX_HISTORY=16000;
+constexpr int MIN_HISTORY=-MAX_HISTORY;
 namespace Hueristics {
     std::array<std::array<Move,2>,200> killer;
-    int prevAlpha,prevBeta;
+    std::array<std::array<std::array<int,64>,64>,2> historyHeuristic;
+}
+namespace timeControls{
+    std::chrono::steady_clock::time_point startTime;
+    int64_t timeLimitMs;
+    bool stopSearch;
 }
 uint64_t nodes=0;
 int getCaptureScore(const Move& move){
@@ -23,6 +31,24 @@ int getCaptureScore(const Move& move){
     Piece captured=(Piece) (getCapturedPiece(move)%6);
     score += (captured-moved+5)*1000;
     return score;
+}
+bool checkTime(){
+    if((nodes&2047)!=0) return timeControls::stopSearch;
+
+    auto now= std::chrono::steady_clock::now();
+    auto elapsed=std::chrono::duration_cast<std::chrono::milliseconds>(now-timeControls::startTime).count();
+
+    if(elapsed>=timeControls::timeLimitMs){
+        timeControls::stopSearch=true;
+    }
+    return timeControls::stopSearch;
+}
+void initSearch(){
+    std::array<std::array<int,64>,64> arr1;
+    std::array<int,64>arr2;
+    arr2.fill(0);
+    arr1.fill(arr2);
+    Hueristics::historyHeuristic.fill(arr1);
 }
 int scoreMove(const Move &move,int ply){
     bool isPromotion=getPromotionPiece(move)!=NO_PIECE;
@@ -40,6 +66,7 @@ int scoreMove(const Move &move,int ply){
     if(Hueristics::killer[ply][1].moveInfo==move.moveInfo){
         score+=5000;
     }
+    score+=Hueristics::historyHeuristic[int(pieceColor(Piece(getMovedPiece(move))))][getFrom(move)][getTo(move)];
     return score;
 }
 int quiescence(Board &board,int alpha,int beta,int ply){
@@ -92,8 +119,13 @@ int quiescence(Board &board,int alpha,int beta,int ply){
     }
     return alpha;
 }
-Move findBestMove(Board &board, int maxDepth){
+Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
     nodes=0;
+    //time start
+    timeControls::startTime=std::chrono::steady_clock::now();
+    timeControls::timeLimitMs=timeLimitMs;
+    timeControls::stopSearch=false;
+
     Move bestMove={0};
     int bestScore=0,score=0,alpha,beta;
     //iterative deepening
@@ -108,7 +140,11 @@ Move findBestMove(Board &board, int maxDepth){
                 alpha=score-window;
                 beta=score+window;
             }
-            score=search(board,depth, 0,-INF,INF,rootBestMove);
+            score=search(board,depth, 0,alpha,beta,rootBestMove);
+            if(timeControls::stopSearch){
+                if(depth == 1 && bestMove.moveInfo == 0) bestMove=rootBestMove;
+                break;
+            }
             if(score<=alpha){
                 alpha-=window;
                 window*=2;
@@ -124,7 +160,7 @@ Move findBestMove(Board &board, int maxDepth){
 }
 int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove){
     nodes++;
-
+    if(checkTime()) return 0;
     //quiescence search
     if(depth==0) return quiescence(board, alpha,  beta, ply);
     Move bestMove={0};
@@ -167,6 +203,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         int R=2+depth/4;
         int score=-search(board,  depth-1-R,  ply+1,-beta,-beta+1,rootBestMove);
         unmakeNullMove(board);
+        if(timeControls::stopSearch) return 0;
         if(score>=beta) return beta;
     }
 
@@ -191,6 +228,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         int score;
         if(i==0){
             score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
+            if(timeControls::stopSearch) return 0;
         }else{
             int newDepth=depth-1;
             bool neededScan=true;
@@ -199,16 +237,20 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
                 int reducedDepth=std::max(newDepth-red,0);
 
                 score=-search(board, reducedDepth,ply+1,-alpha-1,-alpha,rootBestMove);
+                if(timeControls::stopSearch) return 0;
                 neededScan=score>alpha;
             }
             if(neededScan){
                 score=-search(board, depth-1,ply+1,-alpha-1,-alpha,rootBestMove);
+                if(timeControls::stopSearch) return 0;
                 if(score>alpha && score<beta){
                     score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
+                    if(timeControls::stopSearch) return 0;
                 }
             }
         }
         unMakeMove(board);
+        if(timeControls::stopSearch) return 0;
         if(score > bestScore){
             bestScore = score;
             bestMove=move;
@@ -217,6 +259,12 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
             alpha = score;
         //alpha-beta pruning
         if(alpha>=beta){
+            //update history heuristic
+            if(getPromotionPiece(move)==NO_PIECE && !isCapture(move)){
+                int bonus=depth * depth;
+                int from=getFrom(move),to=getTo(move);
+                Hueristics::historyHeuristic[board.sideToMove][from][to]+=bonus-(Hueristics::historyHeuristic[board.sideToMove][from][to]*std::abs(bonus)/MAX_HISTORY);
+            }
             //update killer moves
             if(getPromotionPiece(move)==NO_PIECE && !isCapture(move) && Hueristics::killer[ply][0].moveInfo!=move.moveInfo){
                 if(Hueristics::killer[ply][0].moveInfo==0){
