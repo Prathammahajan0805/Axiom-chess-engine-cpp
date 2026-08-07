@@ -12,8 +12,9 @@
 constexpr int INF=32000;
 constexpr int PROMOTION_PRIOR=10000;
 constexpr int TTMOVE_SCORE=100000;
-namespace search_name {
+namespace Hueristics {
     std::array<std::array<Move,2>,200> killer;
+    int prevAlpha,prevBeta;
 }
 uint64_t nodes=0;
 int getCaptureScore(const Move& move){
@@ -33,10 +34,10 @@ int scoreMove(const Move &move,int ply){
     if(iscapture){
         score+=getCaptureScore(move);
     }
-    if((search_name::killer[ply][0]).moveInfo==move.moveInfo){
+    if((Hueristics::killer[ply][0]).moveInfo==move.moveInfo){
         score+=6000;
     }
-    if(search_name::killer[ply][1].moveInfo==move.moveInfo){
+    if(Hueristics::killer[ply][1].moveInfo==move.moveInfo){
         score+=5000;
     }
     return score;
@@ -94,11 +95,28 @@ int quiescence(Board &board,int alpha,int beta,int ply){
 Move findBestMove(Board &board, int maxDepth){
     nodes=0;
     Move bestMove={0};
-    int bestScore=0;
+    int bestScore=0,score=0,alpha,beta;
     //iterative deepening
     for(int depth=1;depth<=maxDepth;depth++){
         Move rootBestMove={0};
-        int score=search(board,depth, 0,-INF,INF,rootBestMove);
+        int window=25;
+        while(true){
+            if(depth==1){
+                alpha=-INF;
+                beta=INF;
+            }else{
+                alpha=score-window;
+                beta=score+window;
+            }
+            score=search(board,depth, 0,-INF,INF,rootBestMove);
+            if(score<=alpha){
+                alpha-=window;
+                window*=2;
+            }else if(score>=beta){
+                beta+=window;
+                window*=2;
+            }else break;
+        }
         bestMove=rootBestMove;
         bestScore=score;
     }
@@ -200,12 +218,12 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         //alpha-beta pruning
         if(alpha>=beta){
             //update killer moves
-            if(getPromotionPiece(move)==NO_PIECE && !isCapture(move) && search_name::killer[ply][0].moveInfo!=move.moveInfo){
-                if(search_name::killer[ply][0].moveInfo==0){
-                    search_name::killer[ply][0]=move;
+            if(getPromotionPiece(move)==NO_PIECE && !isCapture(move) && Hueristics::killer[ply][0].moveInfo!=move.moveInfo){
+                if(Hueristics::killer[ply][0].moveInfo==0){
+                    Hueristics::killer[ply][0]=move;
                 }else{
-                    search_name::killer[ply][1]=search_name::killer[ply][0];
-                    search_name::killer[ply][0]=move;
+                    Hueristics::killer[ply][1]=Hueristics::killer[ply][0];
+                    Hueristics::killer[ply][0]=move;
                 }
             }
             break;
