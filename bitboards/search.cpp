@@ -5,11 +5,13 @@
 #include "makeMove.h"
 #include "movegen.h"
 #include"moves.h"
+#include "see.h"
 #include "types.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include<chrono>
+#include<cmath>
 constexpr int INF=32000;
 constexpr int PROMOTION_PRIOR=10000;
 constexpr int TTMOVE_SCORE=100000;
@@ -24,13 +26,40 @@ namespace timeControls{
     int64_t timeLimitMs;
     bool stopSearch;
 }
+void stopSearch(){
+    timeControls::stopSearch=true;
+}
 uint64_t nodes=0;
-int getCaptureScore(const Move& move){
+std::array<std::array<int,64>,64> reductionTable;
+void initLMR() {
+    for (int d = 1; d < 64; d++)
+        for (int m = 1; m < 64; m++)
+            reductionTable[d][m] = (int)(0.75 + log(d) * log(m) / 2.25); // to tune
+}
+int scoreToTT(int score, int ply) {
+    if (score >= MATE_SCORE - 1000) return score + ply;
+    if (score <= -MATE_SCORE + 1000) return score - ply;
+    return score;
+}
+int scoreFromTT(int score, int ply) {
+    if (score >= MATE_SCORE - 1000) return score - ply;
+    if (score <= -MATE_SCORE + 1000) return score + ply;
+    return score;
+}
+int getCaptureScore(const Move& move,const Board& board){
     int score=0;
     Piece moved=(Piece) (getMovedPiece(move)%6);
     Piece captured=(Piece) (getCapturedPiece(move)%6);
     score += (captured-moved+5)*1000;
+    if(see(board,move)<0) score-=30000;
+    else score+=20000;
     return score;
+}
+bool isRepetition(const Board& board){
+    for(int i=board.ply-2;i>=board.ply-board.halfMoveClock;i-=2){
+        if(board.hash==board.hashHistory[i]) return true;
+    }
+    return false;
 }
 bool checkTime(){
     if((nodes&2047)!=0) return timeControls::stopSearch;
@@ -49,8 +78,15 @@ void initSearch(){
     arr2.fill(0);
     arr1.fill(arr2);
     Hueristics::historyHeuristic.fill(arr1);
+        Move empty{0};
+
+    std::array<Move,2> emptyKillers{empty, empty};
+
+    Hueristics::killer.fill(emptyKillers);
+    clearTT();
+
 }
-int scoreMove(const Move &move,int ply){
+int scoreMove(const Move &move,int ply,const Board& board){
     bool isPromotion=getPromotionPiece(move)!=NO_PIECE;
     bool iscapture=isCapture(move);
     int score=0;
@@ -58,7 +94,7 @@ int scoreMove(const Move &move,int ply){
         score+=PROMOTION_PRIOR;
     }
     if(iscapture){
-        score+=getCaptureScore(move);
+        score+=getCaptureScore(move,board);
     }
     if((Hueristics::killer[ply][0]).moveInfo==move.moveInfo){
         score+=6000;
@@ -71,7 +107,7 @@ int scoreMove(const Move &move,int ply){
 }
 int quiescence(Board &board,int alpha,int beta,int ply){
     nodes++;
-    
+    if(checkTime()) return 0;
     MoveList moveList=isInCheck((Color) board.sideToMove,board)?generateMoves<ALL>(board):generateMoves<CAPTURES>(board);
     bool inCheck=isInCheck((Color) board.sideToMove,board);
     if(!inCheck){
@@ -93,7 +129,7 @@ int quiescence(Board &board,int alpha,int beta,int ply){
     }
     //get scores
     std::array<int,256> scores;
-    for(int i=0;i<moveList.count;i++) scores[i]=getCaptureScore(moveList.moves[i]);
+    for(int i=0;i<moveList.count;i++) scores[i]=getCaptureScore(moveList.moves[i],board);
 
     //start quiescence search
     for(int i=0;i<moveList.count;i++){
@@ -111,6 +147,10 @@ int quiescence(Board &board,int alpha,int beta,int ply){
         std::swap(moveList.moves[i],moveList.moves[ind]);
         std::swap(scores[i],scores[ind]);
 
+        //see pruning
+         if (!inCheck && isCapture(moveList.moves[i]) && !seeGE(board, moveList.moves[i], 0))
+            continue;
+
         makeMove(board,moveList.moves[i]);
         int score=-quiescence(board,-beta,-alpha, ply+1);
         unMakeMove(board);
@@ -126,32 +166,34 @@ Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
     timeControls::timeLimitMs=timeLimitMs;
     timeControls::stopSearch=false;
 
-    Move bestMove={0};
     int bestScore=0,score=0,alpha,beta;
+    MoveList rootMoves=generateMoves<ALL>(board);
+    Move bestMove={0};
+    if (rootMoves.count > 0) bestMove = rootMoves.moves[0];
+    else return Move{0};
     //iterative deepening
     for(int depth=1;depth<=maxDepth;depth++){
-        Move rootBestMove={0};
+        Move rootBestMove=bestMove;
         int window=25;
-        while(true){
-            if(depth==1){
-                alpha=-INF;
-                beta=INF;
-            }else{
-                alpha=score-window;
-                beta=score+window;
-            }
-            score=search(board,depth, 0,alpha,beta,rootBestMove);
-            if(timeControls::stopSearch){
-                if(depth == 1 && bestMove.moveInfo == 0) bestMove=rootBestMove;
+        while(true) {
+            alpha = score - window;
+            beta  = score + window;
+
+            int newScore = search(board, depth, 0, alpha, beta, rootBestMove);
+
+            if(timeControls::stopSearch)
                 break;
+
+            if(newScore <= alpha || newScore >= beta) {
+                window *= 2;
+                continue;
             }
-            if(score<=alpha){
-                alpha-=window;
-                window*=2;
-            }else if(score>=beta){
-                beta+=window;
-                window*=2;
-            }else break;
+
+            score = newScore;
+            break;
+        }
+        if(timeControls::stopSearch){
+            break;
         }
         bestMove=rootBestMove;
         bestScore=score;
@@ -160,7 +202,7 @@ Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
 }
 int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove){
     nodes++;
-    if(checkTime()) return 0;
+    if(checkTime() || (ply>0 && (isRepetition(board) || board.halfMoveClock>=100 ))) return 0;
     //quiescence search
     if(depth==0) return quiescence(board, alpha,  beta, ply);
     Move bestMove={0};
@@ -170,19 +212,28 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
     if(entry){
         ttMove=entry->bestMove;
         if(entry->depth>=depth && ply!=0){
-            if(entry->flag==EXACT) return entry->score;
-            if(entry->flag==LOWERBOUND) alpha=std::max(alpha,entry->score);
-            if(entry->flag==UPPERBOUND) beta=std::min(beta,entry->score);
-            if(alpha>=beta) return entry->score;
+            if(entry->flag==EXACT) return scoreFromTT(entry->score, ply);
+            if(entry->flag==LOWERBOUND) alpha=std::max(alpha,scoreFromTT(entry->score, ply));
+            if(entry->flag==UPPERBOUND) beta=std::min(beta,scoreFromTT(entry->score, ply));
+            if(alpha>=beta) return scoreFromTT(entry->score, ply);
         }
+    }
+    bool isCheck=isInCheck((Color)board.sideToMove,board);
+
+    //reverse futility pruning
+    if (!isCheck && depth <= 6 && ply != 0 && beta < MATE_SCORE - 1000) {
+        int staticEval = eval(board);
+        int margin = 120 * depth; // tune this
+        if (staticEval - margin >= beta)
+            return staticEval - margin;
     }
     //generate moves
     MoveList moveList=generateMoves<ALL>(board);
-    int bestScore=INT_MIN;
+    int bestScore=-INF;
 
     //checkmate detection
     if(moveList.count==0){
-        if(isInCheck((Color)board.sideToMove,board)){
+        if(isCheck){
             return -MATE_SCORE+ply;
         }else{
             return DRAW_SCORE;
@@ -193,9 +244,8 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
     std::array<int,256> scores;
     for(int i=0;i<moveList.count;i++){ 
         if(moveList.moves[i].moveInfo==ttMove.moveInfo) scores[i]=TTMOVE_SCORE;
-        else scores[i]=scoreMove(moveList.moves[i],ply);
+        else scores[i]=scoreMove(moveList.moves[i],ply,board);
     }
-    bool isCheck=isInCheck((Color) board.sideToMove, board);
 
     //nullmove pruning
     if(depth>=3 && ply!=0 && !isCheck && hasNonePawnPieces(board) && beta<MATE_SCORE-1000){
@@ -206,7 +256,6 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         if(timeControls::stopSearch) return 0;
         if(score>=beta) return beta;
     }
-
     //search
     int origAlpha=alpha;
     for(int i=0;i<moveList.count;i++){
@@ -228,24 +277,23 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         int score;
         if(i==0){
             score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
-            if(timeControls::stopSearch) return 0;
         }else{
-            int newDepth=depth-1;
+            int newDepthBase = depth + (isCheck ? 1 : 0);
+            int newDepth=newDepthBase-1;
             bool neededScan=true;
+            //LMR
             if(depth>=3 && i>=3 && getCapturedPiece(move)==NO_PIECE && !isCheck){
-                int red=1+(i>6?1:0);
+                int red = reductionTable[std::min(depth,63)][std::min(i,63)];
                 int reducedDepth=std::max(newDepth-red,0);
 
                 score=-search(board, reducedDepth,ply+1,-alpha-1,-alpha,rootBestMove);
-                if(timeControls::stopSearch) return 0;
                 neededScan=score>alpha;
             }
             if(neededScan){
                 score=-search(board, depth-1,ply+1,-alpha-1,-alpha,rootBestMove);
-                if(timeControls::stopSearch) return 0;
                 if(score>alpha && score<beta){
                     score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
-                    if(timeControls::stopSearch) return 0;
+
                 }
             }
         }
@@ -254,6 +302,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         if(score > bestScore){
             bestScore = score;
             bestMove=move;
+            if(ply == 0) rootBestMove = bestMove;
         }
         if(score > alpha)
             alpha = score;
@@ -277,8 +326,9 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
             break;
         }
         
-        //tt flag choosing
     }
+    //tt flag choosing
+        if(timeControls::stopSearch) return 0;
         TTFlag flag;
         if(bestScore<=origAlpha){
             flag=UPPERBOUND;
@@ -288,7 +338,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         }else flag=EXACT;
 
         //store in ttentry
-        store(board.hash, bestMove,  depth, bestScore, flag);
+        store(board.hash, bestMove,  depth, scoreToTT(bestScore, ply), flag);
         if(ply==0)rootBestMove=bestMove;
     
     return bestScore;
