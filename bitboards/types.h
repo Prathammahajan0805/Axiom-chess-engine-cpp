@@ -5,6 +5,7 @@ struct Undo{
     int whiteKingSq;
     int blackKingSq;
     int castlingRights;
+    int halfMoveClock;
     uint64_t hash;
 };
 

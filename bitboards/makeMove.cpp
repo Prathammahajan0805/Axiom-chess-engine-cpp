@@ -4,14 +4,18 @@
 #include "moves.h"
 #include "types.h"
 #include "zobrist.h"
+#include <cassert>
 using namespace std;
 
 
 
 void makeMove(Board &board,Move &move){
+    //fix memory overflow caused by long nmatches
+    assert(board.ply < 511 && "ply overflow: history array full");
     board.moveHistory[board.ply]=move;
+    board.hashHistory[board.ply]=board.hash;
     board.history[board.ply++]={board.enPassantSquare,board.whiteKingSquare,
-    board.blackKingSquare,board.castlingRights,board.hash};
+    board.blackKingSquare,board.castlingRights,board.halfMoveClock,board.hash};
     Color color=(Color) board.sideToMove;
     int myColOff=color*6;
     if(board.enPassantSquare!=NO_SQUARE) board.hash ^= randomForEnPassant[board.enPassantSquare%8];
@@ -26,6 +30,11 @@ void makeMove(Board &board,Move &move){
     //update mailbox
     board.pieceOn[from]=NO_PIECE;
     board.pieceOn[to]=(Piece) piece;
+    bool capture=isCapture(move);
+
+    //update halfmove
+    board.halfMoveClock++;
+    if(piece==WP || piece==BP || capture) board.halfMoveClock=0;
 
     //create a from to mask
     Bitboard fromToMask=(1ULL<<from);
@@ -44,7 +53,7 @@ void makeMove(Board &board,Move &move){
     board.occupied ^= fromToMask;
 
     //capture pieces
-    if(isCapture(move) && !isEnPassant(move)){
+    if(capture && !isEnPassant(move)){
         board.pieces[getCapturedPiece(move)] ^= (1ULL<<to);
         if(color==BLACK){
             board.whitePieces ^= (1ULL<<to);
@@ -166,12 +175,14 @@ void makeMove(Board &board,Move &move){
 void unMakeMove(Board &board){
     Move move=board.moveHistory[--board.ply];
     Undo undo=board.history[board.ply];
+    board.hashHistory[board.ply]=board.hash;
 
     //undo
     board.enPassantSquare=undo.enPassantSq;
     board.castlingRights=undo.castlingRights;
     board.blackKingSquare=undo.blackKingSq;
     board.whiteKingSquare=undo.whiteKingSq;
+    board.halfMoveClock=undo.halfMoveClock;
     board.hash=undo.hash;
 
     Color color=(Color)( board.sideToMove ^ 1);

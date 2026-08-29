@@ -15,3 +15,4 @@ constexpr int TT_SIZE=1<<20;
 extern TTEntry TT_Table[TT_SIZE];
 TTEntry* probe(const uint64_t hash);
 void store(uint64_t hash,Move bestMove,int depth,int score,TTFlag flag);
+void clearTT();

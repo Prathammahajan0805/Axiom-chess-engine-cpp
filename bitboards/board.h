@@ -17,6 +17,7 @@ class Board{
         std::array<Piece,64> pieceOn;
         std::array<Undo,512> history;
         std::array<Move,512> moveHistory;
+        std::array<Bitboard,1024> hashHistory;
         Bitboard pieces[12];
         Bitboard whitePieces;
         Bitboard blackPieces;
@@ -28,6 +29,7 @@ class Board{
         int enPassantSquare;
         int whiteKingSquare;
         int blackKingSquare;
+        int halfMoveClock;
 
         Board();
 

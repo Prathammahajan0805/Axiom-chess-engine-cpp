@@ -42,10 +42,10 @@ std::array<std::array<int,64>,12> endgame_pesto_score;
 void initEval(){
     for(int piece=WP;piece<=WK;piece++){
         for(int sq=0;sq<64;sq++){
-            middlegame_pesto_score[piece][sq]=middlegame_value[piece]+pesto::middlegame_Tables[piece][sq];
-            endgame_pesto_score[piece][sq]=endgame_value[piece]+pesto::endgame_Tables[piece][sq];
-            middlegame_pesto_score[piece+6][sq]=middlegame_value[piece]+pesto::middlegame_Tables[piece][sq^56];
-            endgame_pesto_score[piece+6][sq]=endgame_value[piece]+pesto::endgame_Tables[piece][sq^56];
+            middlegame_pesto_score[piece][sq]=middlegame_value[piece]+pesto::middlegame_Tables[piece][sq^56];
+            endgame_pesto_score[piece][sq]=endgame_value[piece]+pesto::endgame_Tables[piece][sq^56];
+            middlegame_pesto_score[piece+6][sq]=middlegame_value[piece]+pesto::middlegame_Tables[piece][sq];
+            endgame_pesto_score[piece+6][sq]=endgame_value[piece]+pesto::endgame_Tables[piece][sq];
         }
     }
 }

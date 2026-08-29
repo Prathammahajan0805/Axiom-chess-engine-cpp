@@ -1,9 +1,11 @@
 #include"board.h"
 #include "attacks.h"
 #include"bitboards.h"
+#include "search.h"
 #include "zobrist.h"
 #include"evaluation.h"
 #include<sstream>
+#include"TT.h"
 using namespace std;
 
 int charToPiece(char c){
@@ -34,6 +36,7 @@ void Board::clearBoard() {
 
     whiteKingSquare = NO_SQUARE;
     blackKingSquare = NO_SQUARE;
+    ply=0;
 }
 void Board::loadFEN(const string& fen) {
         
@@ -110,6 +113,7 @@ void Board::loadFEN(const string& fen) {
             enPassantSquare = getSquare(epfile, eprank);
         }
         updateOccupancies();
+        
 }
 void Board::print(Bitboard bb) const{
     string s="\n  --------------------------------\n";
@@ -171,6 +175,7 @@ string Board::toFEN() const {
 Board::Board(){
     pieceOn.fill(NO_PIECE);
     hash=0ULL;
+    halfMoveClock=0;
     loadFEN(startingFen);
     initLeaperAttacks();
     initLineBetween();
@@ -181,4 +186,6 @@ Board::Board(){
     initSplats();
     initPassedPawnsMask();
     initFileMasks();
+    initSearch();
+    initLMR();
 }
