@@ -17,10 +17,11 @@ constexpr int PROMOTION_PRIOR=10000;
 constexpr int TTMOVE_SCORE=100000;
 constexpr int MAX_HISTORY=16000;
 constexpr int MIN_HISTORY=-MAX_HISTORY;
+//dear devs this here is the heart of my engine and 3 to 4 months from my life if any of this seems over complicated or not needed that because it probably is not 
 namespace Hueristics {
     std::array<std::array<Move,2>,200> killer;
     std::array<std::array<std::array<int,64>,64>,2> historyHeuristic;
-}
+}                                                                                                                                                                                                                                                                                                                               //engine by none other than pratham mahajan
 namespace timeControls{
     std::chrono::steady_clock::time_point startTime;
     int64_t timeLimitMs;
@@ -29,8 +30,14 @@ namespace timeControls{
 void stopSearch(){
     timeControls::stopSearch=true;
 }
+void clearKillers(){
+    Move empty={0};
+    std::array<Move,2> emptyKillers{empty, empty};
+    Hueristics::killer.fill(emptyKillers);
+}
 uint64_t nodes=0;
 std::array<std::array<int,64>,64> reductionTable;
+//this here is taken straight from reliable sources (chess programming wiki) dont ask me why these constants or curve it is the most tested and trusted one i have found so bare with me
 void initLMR() {
     for (int d = 1; d < 64; d++)
         for (int m = 1; m < 64; m++)
@@ -56,7 +63,7 @@ int getCaptureScore(const Move& move,const Board& board){
     return score;
 }
 bool isRepetition(const Board& board){
-    for(int i=board.ply-2;i>=board.ply-board.halfMoveClock;i-=2){
+    for(int i=board.ply-2;i>=std::max(0,board.ply-board.halfMoveClock);i-=2){
         if(board.hash==board.hashHistory[i]) return true;
     }
     return false;
@@ -78,7 +85,7 @@ void initSearch(){
     arr2.fill(0);
     arr1.fill(arr2);
     Hueristics::historyHeuristic.fill(arr1);
-        Move empty{0};
+    Move empty{0};
 
     std::array<Move,2> emptyKillers{empty, empty};
 
@@ -162,6 +169,9 @@ int quiescence(Board &board,int alpha,int beta,int ply){
 Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
     nodes=0;
     //time start
+
+    // clear killers
+    clearKillers();
     timeControls::startTime=std::chrono::steady_clock::now();
     timeControls::timeLimitMs=timeLimitMs;
     timeControls::stopSearch=false;
@@ -174,24 +184,28 @@ Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
     //iterative deepening
     for(int depth=1;depth<=maxDepth;depth++){
         Move rootBestMove=bestMove;
-        int window=25;
+        int alphaWindow=25, betaWindow=25;
+        alpha = score - alphaWindow;
+        beta  = score + betaWindow;
+        //aspiration windows
         while(true) {
-            alpha = score - window;
-            beta  = score + window;
-
             int newScore = search(board, depth, 0, alpha, beta, rootBestMove);
 
             if(timeControls::stopSearch)
                 break;
 
-            if(newScore <= alpha || newScore >= beta) {
-                window *= 2;
-                continue;
+            if(newScore <= alpha) {
+                alphaWindow *= 2;
+                alpha = score - alphaWindow;
+            } else if(newScore >= beta) {
+                betaWindow *= 2;
+                beta = score + betaWindow;
+            } else {
+                score = newScore;
+                break;
             }
-
-            score = newScore;
-            break;
         }
+
         if(timeControls::stopSearch){
             break;
         }
@@ -203,7 +217,7 @@ Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
 int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove){
     nodes++;
     if(checkTime() || (ply>0 && (isRepetition(board) || board.halfMoveClock>=100 ))) return 0;
-    //quiescence search
+    //quiescence search check if beyond depth are their any capture that just blunders 
     if(depth==0) return quiescence(board, alpha,  beta, ply);
     Move bestMove={0};
     //get ttmove
@@ -257,7 +271,9 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         if(score>=beta) return beta;
     }
     //search
+    int newDepth = depth-1 + (isCheck ? 1 : 0);
     int origAlpha=alpha;
+
     for(int i=0;i<moveList.count;i++){
         int maxScoreMove=scores[i],ind=i;
 
@@ -276,12 +292,11 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         makeMove(board,move);
         int score;
         if(i==0){
-            score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
+            score=-search(board, newDepth,ply+1,-beta,-alpha,rootBestMove);
         }else{
-            int newDepthBase = depth + (isCheck ? 1 : 0);
-            int newDepth=newDepthBase-1;
             bool neededScan=true;
             //LMR
+            // so what lmr basicaly does is that it checks if the current move at lower depth atleast beats alhpa if it does only then full depth scan is needed else just skip that shit and move on
             if(depth>=3 && i>=3 && getCapturedPiece(move)==NO_PIECE && !isCheck){
                 int red = reductionTable[std::min(depth,63)][std::min(i,63)];
                 int reducedDepth=std::max(newDepth-red,0);
@@ -289,15 +304,18 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
                 score=-search(board, reducedDepth,ply+1,-alpha-1,-alpha,rootBestMove);
                 neededScan=score>alpha;
             }
+            //full scan this increases work if the score beats alpha but is an overall win if many node branches are pruned 
             if(neededScan){
-                score=-search(board, depth-1,ply+1,-alpha-1,-alpha,rootBestMove);
+                score=-search(board, newDepth,ply+1,-alpha-1,-alpha,rootBestMove);
                 if(score>alpha && score<beta){
-                    score=-search(board, depth-1,ply+1,-beta,-alpha,rootBestMove);
+                    score=-search(board, newDepth,ply+1,-beta,-alpha,rootBestMove);
 
                 }
             }
         }
         unMakeMove(board);
+
+        // just time control stuff
         if(timeControls::stopSearch) return 0;
         if(score > bestScore){
             bestScore = score;
@@ -306,7 +324,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         }
         if(score > alpha)
             alpha = score;
-        //alpha-beta pruning
+        //alpha-beta pruning(beta cut-off)
         if(alpha>=beta){
             //update history heuristic
             if(getPromotionPiece(move)==NO_PIECE && !isCapture(move)){
@@ -321,6 +339,16 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
                 }else{
                     Hueristics::killer[ply][1]=Hueristics::killer[ply][0];
                     Hueristics::killer[ply][0]=move;
+                }
+            }
+            // penalize a move that was tried but failed (malus)
+            for (int j = 0; j < i; j++) {
+                Move &prev = moveList.moves[j];
+                if (getPromotionPiece(prev)==NO_PIECE && !isCapture(prev)) {
+                    int malus = -depth*depth;
+                    int f=getFrom(prev), t=getTo(prev);
+                    auto &h = Hueristics::historyHeuristic[board.sideToMove][f][t];
+                    h += malus - (h * std::abs(malus) / MAX_HISTORY);
                 }
             }
             break;

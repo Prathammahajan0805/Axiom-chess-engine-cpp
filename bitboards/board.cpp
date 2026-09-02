@@ -2,6 +2,7 @@
 #include "attacks.h"
 #include"bitboards.h"
 #include "search.h"
+#include "types.h"
 #include "zobrist.h"
 #include"evaluation.h"
 #include<sstream>
@@ -33,7 +34,7 @@ void Board::clearBoard() {
     sideToMove = WHITE;
     castlingRights = 0;
     enPassantSquare = NO_SQUARE;
-
+    hash=0ULL;
     whiteKingSquare = NO_SQUARE;
     blackKingSquare = NO_SQUARE;
     ply=0;
@@ -42,7 +43,6 @@ void Board::loadFEN(const string& fen) {
         
         clearBoard();
         std::stringstream ss(fen);
-
         std::string boardPart;
         std::string sidePart;
         std::string castlePart;
@@ -77,7 +77,7 @@ void Board::loadFEN(const string& fen) {
                 whiteKingSquare = getSquare(file,  rank);
             if(piece == BK)
                 blackKingSquare = getSquare(file,  rank);
-            
+            hash^=randomForZobrist[piece][getSquare(file,rank)];
 
             file++;
         }
@@ -85,6 +85,9 @@ void Board::loadFEN(const string& fen) {
         // ---------------- Side to move ----------------
 
         sideToMove = (sidePart == "w") ? WHITE : BLACK;
+        if(sideToMove==BLACK){
+            hash^=randomForSide;
+        }
 
         // ---------------- Castling ----------------
 
@@ -101,7 +104,7 @@ void Board::loadFEN(const string& fen) {
 
         if (castlePart.find('q') != std::string::npos)
             castlingRights |= Castling::BLACK_QUEENSIDE;
-
+        hash^=randomForCastling[castlingRights];
         // ---------------- En passant ----------------
 
         if (epPart == "-") {
@@ -111,6 +114,7 @@ void Board::loadFEN(const string& fen) {
             int epfile = epPart[0] - 'a';
             int eprank = epPart[1] - '1';
             enPassantSquare = getSquare(epfile, eprank);
+            hash^=randomForEnPassant[epfile];
         }
         updateOccupancies();
         

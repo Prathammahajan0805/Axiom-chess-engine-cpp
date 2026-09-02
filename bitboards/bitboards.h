@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <bitset>
@@ -46,14 +47,17 @@ inline void clearBit(Bitboard &bb,int sq){bb &= ~(1ULL<<sq); }
 inline int getBit(Bitboard bb,int sq){ return (bb>>sq) & 1ULL; }
 std::string squareToString(int sq);
 inline int popCount(Bitboard bb){
+    assert(bb);
     return __builtin_popcountll(bb);
 }
 
 inline int bitScan(Bitboard bb){
+    assert(bb);
     return __builtin_ctzll(bb);
 }
 
 inline int popLSB(Bitboard& bb){
+    assert(bb);
     int sq=bitScan(bb);
     bb &= (bb-1);
     return sq;

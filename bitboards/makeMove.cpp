@@ -173,9 +173,9 @@ void makeMove(Board &board,Move &move){
 }
 
 void unMakeMove(Board &board){
+    assert(board.ply > 0 && board.ply <= 512 && "unMake: ply underflow");
     Move move=board.moveHistory[--board.ply];
     Undo undo=board.history[board.ply];
-    board.hashHistory[board.ply]=board.hash;
 
     //undo
     board.enPassantSquare=undo.enPassantSq;
@@ -264,6 +264,8 @@ void unMakeMove(Board &board){
     board.sideToMove ^= 1;
 }
 void makeNullMove(Board &board){
+    // In makeNullMove()
+    assert(board.ply >= 0 && board.ply < 512 && "makeNullMove: ply out of bounds");
     Undo& undo=board.history[board.ply++];
     undo.hash=board.hash;
     undo.enPassantSq=board.enPassantSquare;
@@ -275,6 +277,7 @@ void makeNullMove(Board &board){
     board.sideToMove^=1;
 }
 void unmakeNullMove(Board &board){
+    assert(board.ply > 0 && board.ply <= 512 && "unMake: ply underflow");
     Undo& undo=board.history[--board.ply];
     board.enPassantSquare=undo.enPassantSq;
     board.hash=undo.hash;
