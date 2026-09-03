@@ -17,10 +17,18 @@ constexpr int PROMOTION_PRIOR=10000;
 constexpr int TTMOVE_SCORE=100000;
 constexpr int MAX_HISTORY=16000;
 constexpr int MIN_HISTORY=-MAX_HISTORY;
+constexpr int MAX_PLY=128;
+std::array<std::array<Move,MAX_PLY>,MAX_PLY> pvTable;
+std:: array<int,MAX_PLY> pvLength;
 //dear devs this here is the heart of my engine and 3 to 4 months from my life if any of this seems over complicated or not needed that because it probably is not 
 namespace Hueristics {
+    //killer moves
     std::array<std::array<Move,2>,200> killer;
+    //move history
     std::array<std::array<std::array<int,64>,64>,2> historyHeuristic;
+    //continuation history
+    std::array<std::array<std::array<std::array<int,64>,6>,64>,6> contHistory;
+    std::array<std::pair<int,int>, 200> moveStack; 
 }                                                                                                                                                                                                                                                                                                                               //engine by none other than pratham mahajan
 namespace timeControls{
     std::chrono::steady_clock::time_point startTime;
@@ -79,6 +87,7 @@ bool checkTime(){
     }
     return timeControls::stopSearch;
 }
+//the least underwhelming function you will find here
 void initSearch(){
     std::array<std::array<int,64>,64> arr1;
     std::array<int,64>arr2;
@@ -86,7 +95,11 @@ void initSearch(){
     arr1.fill(arr2);
     Hueristics::historyHeuristic.fill(arr1);
     Move empty{0};
-
+    std::array<std::array<int,64>,6> arr4;
+    arr4.fill(arr2);
+    std::array<std::array<std::array<int,64>,6>,64> arr3;
+    arr3.fill(arr4);
+    Hueristics::contHistory.fill(arr3);
     std::array<Move,2> emptyKillers{empty, empty};
 
     Hueristics::killer.fill(emptyKillers);
@@ -109,6 +122,10 @@ int scoreMove(const Move &move,int ply,const Board& board){
     if(Hueristics::killer[ply][1].moveInfo==move.moveInfo){
         score+=5000;
     }
+    if(ply>0){
+    int prevPiece=Hueristics::moveStack[ply-1].first, prevTo = Hueristics::moveStack[ply-1].second;
+    score += Hueristics::contHistory[prevPiece][prevTo][getMovedPiece(move)%6][getTo(move)];
+}
     score+=Hueristics::historyHeuristic[int(pieceColor(Piece(getMovedPiece(move))))][getFrom(move)][getTo(move)];
     return score;
 }
@@ -136,13 +153,20 @@ int quiescence(Board &board,int alpha,int beta,int ply){
     }
     //get scores
     std::array<int,256> scores;
-    for(int i=0;i<moveList.count;i++) scores[i]=getCaptureScore(moveList.moves[i],board);
+    for(int i=0;i<moveList.count;i++){
+        if(!inCheck){
+            scores[i]=getCaptureScore(moveList.moves[i],board);
+        }else{
+            scores[i]=Hueristics::historyHeuristic[pieceColor(Piece(getMovedPiece(moveList.moves[i])))][getFrom(moveList.moves[i])][getTo(moveList.moves[i])];
+        }
+    }
 
-    //start quiescence search
+    //start quiescence search using selection sort to get nice move ordering and faster results 
+    //why selction sort you ask because i can immediately select and use th move instead of sorting the whole thing and use it making overall less time consumming
     for(int i=0;i<moveList.count;i++){
         int maxScoreMove=scores[i],ind=i;
 
-        //filtering for move scores
+        //filtering for move scores (selection sort)
         for(int j=i;j<moveList.count;j++){
             if(maxScoreMove<scores[j]){
                 maxScoreMove=scores[j];
@@ -154,7 +178,7 @@ int quiescence(Board &board,int alpha,int beta,int ply){
         std::swap(moveList.moves[i],moveList.moves[ind]);
         std::swap(scores[i],scores[ind]);
 
-        //see pruning
+        //see pruning expensive as hell but works its charm so called once per capture here and for scoring moves at  getCaptureScore
          if (!inCheck && isCapture(moveList.moves[i]) && !seeGE(board, moveList.moves[i], 0))
             continue;
 
@@ -189,7 +213,7 @@ Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
         beta  = score + betaWindow;
         //aspiration windows
         while(true) {
-            int newScore = search(board, depth, 0, alpha, beta, rootBestMove);
+            int newScore = search(board, depth, 0, alpha, beta,true);
 
             if(timeControls::stopSearch)
                 break;
@@ -209,38 +233,58 @@ Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
         if(timeControls::stopSearch){
             break;
         }
-        bestMove=rootBestMove;
+        bestMove=pvTable[0][0];
         bestScore=score;
     }
     return bestMove;
 }
-int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove){
+int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV){
     nodes++;
     if(checkTime() || (ply>0 && (isRepetition(board) || board.halfMoveClock>=100 ))) return 0;
+
+    //if possition is way too bad that mate is incomming or way too god such that you are goin to mate there is nothing to search just return your alpha and be happy
+    alpha = std::max(alpha, -MATE_SCORE + ply);
+    beta  = std::min(beta,   MATE_SCORE - ply - 1);
+    if(alpha >= beta) return alpha;
+
     //quiescence search check if beyond depth are their any capture that just blunders 
     if(depth==0) return quiescence(board, alpha,  beta, ply);
+
+    //triangular pv array length of current ply
+    pvLength[ply]=ply;
+
     Move bestMove={0};
     //get ttmove
     TTEntry* entry=probe(board.hash);
     Move ttMove={0};
+    //check if any move is there
     if(entry){
         ttMove=entry->bestMove;
         if(entry->depth>=depth && ply!=0){
-            if(entry->flag==EXACT) return scoreFromTT(entry->score, ply);
-            if(entry->flag==LOWERBOUND) alpha=std::max(alpha,scoreFromTT(entry->score, ply));
-            if(entry->flag==UPPERBOUND) beta=std::min(beta,scoreFromTT(entry->score, ply));
-            if(alpha>=beta) return scoreFromTT(entry->score, ply);
+            if(entry->flag==EXACT) return scoreFromTT(entry->score, ply);//score is exactly this good
+            if(entry->flag==LOWERBOUND) alpha=std::max(alpha,scoreFromTT(entry->score, ply));//score is atleast this good
+            if(entry->flag==UPPERBOUND) beta=std::min(beta,scoreFromTT(entry->score, ply));//score is atmost this good
+            if(alpha>=beta) return scoreFromTT(entry->score, ply);//direct cutoff no need to check
         }
     }
-    bool isCheck=isInCheck((Color)board.sideToMove,board);
 
+    
+    bool isCheck=isInCheck((Color)board.sideToMove,board);
+    //no tt move so we shave a depth off
+    if(!entry && depth>=4 && !isCheck){
+        depth -= 1;
+    }
     //reverse futility pruning
+    int staticEval = eval(board);
     if (!isCheck && depth <= 6 && ply != 0 && beta < MATE_SCORE - 1000) {
-        int staticEval = eval(board);
         int margin = 120 * depth; // tune this
         if (staticEval - margin >= beta)
             return staticEval - margin;
     }
+
+    
+
+
     //generate moves
     MoveList moveList=generateMoves<ALL>(board);
     int bestScore=-INF;
@@ -265,7 +309,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
     if(depth>=3 && ply!=0 && !isCheck && hasNonePawnPieces(board) && beta<MATE_SCORE-1000){
         makeNullMove(board);
         int R=2+depth/4;
-        int score=-search(board,  depth-1-R,  ply+1,-beta,-beta+1,rootBestMove);
+        int score=-search(board,  depth-1-R,  ply+1,-beta,-beta+1,false);
         unmakeNullMove(board);
         if(timeControls::stopSearch) return 0;
         if(score>=beta) return beta;
@@ -288,27 +332,46 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         std::swap(scores[i],scores[ind]);
         Move &move=moveList.moves[i];
 
+        //late move pruning/move count pruning this is to remove the backbenchers of bad move which recieve a bad score dont even let them try cause you will only waste time
+        if(!isPV && !isCheck && depth<=8 && bestScore>-MATE_SCORE+1000 && getCapturedPiece(move)==NO_PIECE && getPromotionPiece(move)==NO_PIECE){
+            int lmpThreshold = 3 + 2*depth*depth; // tune
+            if(i >= lmpThreshold) continue;
+        }
+        //forward futiliy pruning bassically saying that the current position is so bad not even a good move can save me from this mess let alone a quiet one
+        if(!isPV && !isCheck && depth<=8 && getCapturedPiece(move)==NO_PIECE && getPromotionPiece(move)==NO_PIECE && bestScore>-MATE_SCORE+1000){
+            int futilityMargin = 100 + 90*depth; // tune
+            if(staticEval + futilityMargin <= alpha) continue;
+        }
+        //see pruning nice right 
+        if(!isPV && depth<=8 && bestScore>-MATE_SCORE+1000){
+            int seeMargin = isCapture(move) ? -20*depth*depth : -50*depth; // tune both
+            if(!seeGE(board, move, seeMargin)) continue;
+        }
+        //store move stack for continuation history
+        Hueristics::moveStack[ply] = {getMovedPiece(move)%6, getTo(move)};
+
         //evaluate
         makeMove(board,move);
         int score;
         if(i==0){
-            score=-search(board, newDepth,ply+1,-beta,-alpha,rootBestMove);
+            score=-search(board, newDepth,ply+1,-beta,-alpha,isPV);
         }else{
             bool neededScan=true;
             //LMR
             // so what lmr basicaly does is that it checks if the current move at lower depth atleast beats alhpa if it does only then full depth scan is needed else just skip that shit and move on
-            if(depth>=3 && i>=3 && getCapturedPiece(move)==NO_PIECE && !isCheck){
+            bool givesCheck = isInCheck((Color)board.sideToMove, board); //sideToMove is now the opponent as toggled by make move
+            if(depth>=3 && i>=3 && getCapturedPiece(move)==NO_PIECE && !isCheck && !givesCheck){
                 int red = reductionTable[std::min(depth,63)][std::min(i,63)];
                 int reducedDepth=std::max(newDepth-red,0);
 
-                score=-search(board, reducedDepth,ply+1,-alpha-1,-alpha,rootBestMove);
+                score=-search(board, reducedDepth,ply+1,-alpha-1,-alpha,false);
                 neededScan=score>alpha;
             }
             //full scan this increases work if the score beats alpha but is an overall win if many node branches are pruned 
             if(neededScan){
-                score=-search(board, newDepth,ply+1,-alpha-1,-alpha,rootBestMove);
+                score=-search(board, newDepth,ply+1,-alpha-1,-alpha,false);
                 if(score>alpha && score<beta){
-                    score=-search(board, newDepth,ply+1,-beta,-alpha,rootBestMove);
+                    score=-search(board, newDepth,ply+1,-beta,-alpha,isPV);
 
                 }
             }
@@ -320,10 +383,16 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         if(score > bestScore){
             bestScore = score;
             bestMove=move;
-            if(ply == 0) rootBestMove = bestMove;
         }
-        if(score > alpha)
+        if(score > alpha){
             alpha = score;
+            pvTable[ply][ply]=move;
+            for(int nextPly=ply+1;nextPly<pvLength[ply+1];nextPly++){
+                pvTable[ply][nextPly]=pvTable[ply+1][nextPly];
+            }
+            pvLength[ply]=pvLength[ply+1];
+        }
+            
         //alpha-beta pruning(beta cut-off)
         if(alpha>=beta){
             //update history heuristic
@@ -331,6 +400,11 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
                 int bonus=depth * depth;
                 int from=getFrom(move),to=getTo(move);
                 Hueristics::historyHeuristic[board.sideToMove][from][to]+=bonus-(Hueristics::historyHeuristic[board.sideToMove][from][to]*std::abs(bonus)/MAX_HISTORY);
+                if(ply>0){
+                    auto [prevPiece, prevTo] = Hueristics::moveStack[ply-1];
+                    auto &ch = Hueristics::contHistory[prevPiece][prevTo][getMovedPiece(move)][to];
+                    ch += bonus - (ch*std::abs(bonus)/MAX_HISTORY);
+                }
             }
             //update killer moves
             if(getPromotionPiece(move)==NO_PIECE && !isCapture(move) && Hueristics::killer[ply][0].moveInfo!=move.moveInfo){
@@ -346,9 +420,14 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
                 Move &prev = moveList.moves[j];
                 if (getPromotionPiece(prev)==NO_PIECE && !isCapture(prev)) {
                     int malus = -depth*depth;
-                    int f=getFrom(prev), t=getTo(prev);
-                    auto &h = Hueristics::historyHeuristic[board.sideToMove][f][t];
+                    int from=getFrom(prev), to=getTo(prev);
+                    auto &h = Hueristics::historyHeuristic[board.sideToMove][from][to];
                     h += malus - (h * std::abs(malus) / MAX_HISTORY);
+                    if(ply>0){
+                        auto [prevPiece, prevTo] = Hueristics::moveStack[ply-1];
+                        auto &ch = Hueristics::contHistory[prevPiece][prevTo][getMovedPiece(move)][to];
+                        ch += malus - (ch * std::abs(malus) / MAX_HISTORY);
+                    }
                 }
             }
             break;
@@ -359,15 +438,14 @@ int search(Board &board,int depth,int ply,int alpha,int beta,Move& rootBestMove)
         if(timeControls::stopSearch) return 0;
         TTFlag flag;
         if(bestScore<=origAlpha){
-            flag=UPPERBOUND;
+            flag=UPPERBOUND;//atmost this good
         }
         else if(bestScore>=beta){
-            flag=LOWERBOUND;
-        }else flag=EXACT;
+            flag=LOWERBOUND;//atleast this good
+        }else flag=EXACT;//exactly this good
 
         //store in ttentry
         store(board.hash, bestMove,  depth, scoreToTT(bestScore, ply), flag);
-        if(ply==0)rootBestMove=bestMove;
     
     return bestScore;
 }
