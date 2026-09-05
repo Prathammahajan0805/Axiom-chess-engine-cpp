@@ -8,6 +8,7 @@
 #include<cmath>
 #include <thread>
 static const std::string STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+GoParams p;
 std::thread searchThread;
 using namespace std;
 vector<string> splitTokens(string line){
@@ -35,7 +36,6 @@ void launchSearch(int depth,uint64_t timeMs,Board& board){
     joinSearch();
     searchThread=std::thread([&board,depth,timeMs](){
         Move best=findBestMove(board, depth,timeMs);
-        std::cout<<"bestmove "<<moveToUci(best)<<std::endl;
     });
 }
 Move uciToMove(const std::string& moveStr, Board& board) {
@@ -96,7 +96,7 @@ void computeSearchBudget(const GoParams& p, Color side, int& depthOut, int64_t& 
         int movesToGo     = (p.movestogo > 0) ? p.movestogo : 30;
  
         int64_t budget = remaining / movesToGo + (inc * 8) / 10; 
-        budget = std::min(budget, remaining - 50);
+        budget = std::min(budget*2.0,remaining *0.8);
         if (budget < 10) budget = 10;
  
         depthOut = (p.depth > 0) ? p.depth : MAX_SEARCH_DEPTH;
@@ -107,7 +107,7 @@ void computeSearchBudget(const GoParams& p, Color side, int& depthOut, int64_t& 
     timeMsOut = HUGE_TIME_MS;
 }
 GoParams parseGo(const std::vector<std::string>& tokens) {
-    GoParams p;
+    p= GoParams();
     for (size_t i = 1; i < tokens.size(); i++) {
         if (tokens[i] == "depth" && i + 1 < tokens.size())      p.depth = stoi(tokens[++i]);
         else if (tokens[i] == "movetime" && i + 1 < tokens.size())p.movetime = stoll(tokens[++i]);
@@ -175,7 +175,7 @@ void initUCI(){
             applyPositionCommand(tokens,board);
         }else if(cmd=="go"){
             joinSearch();
-            GoParams p=parseGo(tokens);
+            p=parseGo(tokens);
             int depth;
             int64_t timeMs;
             computeSearchBudget(p,Color(board.sideToMove), depth, timeMs);

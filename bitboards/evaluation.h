@@ -1,7 +1,20 @@
 # pragma once
-
 #include "board.h"
-const int middlegamePawn_Table[64] = {
+#include<iostream>
+struct PawnEntry {
+    uint64_t key = 0;
+    int mg[2] = {0,0};   // mg score contribution per color
+    int eg[2] = {0,0};
+};
+
+constexpr int PAWN_HASH_SIZE = 1 << 16; // 64k entries, ~1.5MB — tune
+class PawnHashTable {
+    public:
+    std::vector<PawnEntry> table{PAWN_HASH_SIZE};
+    PawnEntry* probe(uint64_t pawnHash);
+    void store(uint64_t pawnHash, const std::array<int,2>& mg, const std::array<int,2>& eg);
+};
+constexpr int middlegamePawn_Table[64] = {
       0,   0,   0,   0,   0,   0,  0,   0,
      98, 134,  61,  95,  68, 126, 34, -11,
      -6,   7,  26,  31,  65,  56, 25, -20,
@@ -12,7 +25,22 @@ const int middlegamePawn_Table[64] = {
       0,   0,   0,   0,   0,   0,  0,   0,
 };
 
-const int endgamePawn_Table[64] = {
+
+
+constexpr int kingDangerTable[100] = {
+    0,   0,   1,   2,   3,   5,   7,   9,  12,  15,
+   18,  22,  26,  30,  35,  39,  44,  50,  56,  62,
+   68,  75,  82,  85,  89,  97, 105, 113, 122, 131,
+  140, 150, 169, 180, 191, 202, 213, 225, 237, 248,
+  260, 272, 283, 295, 307, 319, 330, 342, 354, 366,
+  377, 389, 401, 412, 424, 436, 448, 459, 471, 483,
+  494, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+  500,500,500,500,500,500,500,500,500,500,
+  500,500,500,500,500,500,500,500,500,500,
+  500,500,500,500,500,500,500,500,500,500
+};
+
+constexpr int endgamePawn_Table[64] = {
       0,   0,   0,   0,   0,   0,   0,   0,
     178, 173, 158, 134, 147, 132, 165, 187,
      94, 100,  85,  67,  56,  53,  82,  84,
@@ -23,7 +51,7 @@ const int endgamePawn_Table[64] = {
       0,   0,   0,   0,   0,   0,   0,   0,
 };
 
-const int middlegameKnight_table[64] = {
+constexpr int middlegameKnight_table[64] = {
     -167, -89, -34, -49,  61, -97, -15, -107,
      -73, -41,  72,  36,  23,  62,   7,  -17,
      -47,  60,  37,  65,  84, 129,  73,   44,
@@ -34,7 +62,7 @@ const int middlegameKnight_table[64] = {
     -105, -21, -58, -33, -17, -28, -19,  -23,
 };
 
-const int endgameKnight_table[64] = {
+constexpr int endgameKnight_table[64] = {
     -58, -38, -13, -28, -31, -27, -63, -99,
     -25,  -8, -25,  -2,  -9, -25, -24, -52,
     -24, -20,  10,   9,  -1,  -9, -19, -41,
@@ -45,7 +73,7 @@ const int endgameKnight_table[64] = {
     -29, -51, -23, -15, -22, -18, -50, -64,
 };
 
-const int middlegameBishop_table[64] = {
+constexpr int middlegameBishop_table[64] = {
     -29,   4, -82, -37, -25, -42,   7,  -8,
     -26,  16, -18, -13,  30,  59,  18, -47,
     -16,  37,  43,  40,  35,  50,  37,  -2,
@@ -56,7 +84,7 @@ const int middlegameBishop_table[64] = {
     -33,  -3, -14, -21, -13, -12, -39, -21,
 };
 
-const int endgameBishop_table[64] = {
+constexpr int endgameBishop_table[64] = {
     -14, -21, -11,  -8, -7,  -9, -17, -24,
      -8,  -4,   7, -12, -3, -13,  -4, -14,
       2,  -8,   0,  -1, -2,   6,   0,   4,
@@ -67,7 +95,7 @@ const int endgameBishop_table[64] = {
     -23,  -9, -23,  -5, -9, -16,  -5, -17,
 };
 
-const int middlegameRook_table[64] = {
+constexpr int middlegameRook_table[64] = {
      32,  42,  32,  51, 63,  9,  31,  43,
      27,  32,  58,  62, 80, 67,  26,  44,
      -5,  19,  26,  36, 17, 45,  61,  16,
@@ -78,7 +106,7 @@ const int middlegameRook_table[64] = {
     -19, -13,   1,  17, 16,  7, -37, -26,
 };
 
-const int endgameRook_table[64] = {
+constexpr int endgameRook_table[64] = {
     13, 10, 18, 15, 12,  12,   8,   5,
     11, 13, 13, 11, -3,   3,   8,   3,
      7,  7,  7,  5,  4,  -3,  -5,  -3,
@@ -89,7 +117,7 @@ const int endgameRook_table[64] = {
     -9,  2,  3, -1, -5, -13,   4, -20,
 };
 
-const int middlegameQueen_table[64] = {
+constexpr int middlegameQueen_table[64] = {
     -28,   0,  29,  12,  59,  44,  43,  45,
     -24, -39,  -5,   1, -16,  57,  28,  54,
     -13, -17,   7,   8,  29,  56,  47,  57,
@@ -100,7 +128,7 @@ const int middlegameQueen_table[64] = {
      -1, -18,  -9,  10, -15, -25, -31, -50,
 };
 
-const int endgameQueen_table[64] = {
+constexpr int endgameQueen_table[64] = {
      -9,  22,  22,  27,  27,  19,  10,  20,
     -17,  20,  32,  41,  58,  25,  30,   0,
     -20,   6,   9,  49,  47,  35,  19,   9,
@@ -111,7 +139,7 @@ const int endgameQueen_table[64] = {
     -33, -28, -22, -43,  -5, -32, -20, -41,
 };
 
-const int middlegameKing_table[64] = {
+constexpr int middlegameKing_table[64] = {
     -65,  23,  16, -15, -56, -34,   2,  13,
      29,  -1, -20,  -7,  -8,  -4, -38, -29,
      -9,  24,   2, -16, -20,   6,  22, -22,
@@ -122,7 +150,7 @@ const int middlegameKing_table[64] = {
     -15,  36,  12, -54,   8, -28,  24,  14,
 };
 
-const int endgameKing_table[64] = {
+constexpr int endgameKing_table[64] = {
     -74, -35, -18, -18, -11,  15,   4, -17,
     -12,  17,  14,  17,  17,  38,  23,  11,
      10,  17,  23,  15,  20,  45,  44,  13,

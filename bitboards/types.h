@@ -7,6 +7,7 @@ struct Undo{
     int castlingRights;
     int halfMoveClock;
     uint64_t hash;
+    uint64_t pawnHash;
 };
 
 enum Piece : int {

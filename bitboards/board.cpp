@@ -34,7 +34,7 @@ void Board::clearBoard() {
     sideToMove = WHITE;
     castlingRights = 0;
     enPassantSquare = NO_SQUARE;
-    hash=0ULL;
+    hash=pawnHash=0ULL;
     whiteKingSquare = NO_SQUARE;
     blackKingSquare = NO_SQUARE;
     ply=0;
@@ -78,6 +78,9 @@ void Board::loadFEN(const string& fen) {
             if(piece == BK)
                 blackKingSquare = getSquare(file,  rank);
             hash^=randomForZobrist[piece][getSquare(file,rank)];
+            if(piece==WP || piece==BP){
+                pawnHash ^= randomForZobrist[piece][getSquare(file,rank)];
+            }
 
             file++;
         }
@@ -178,7 +181,7 @@ string Board::toFEN() const {
 }
 Board::Board(){
     pieceOn.fill(NO_PIECE);
-    hash=0ULL;
+    hash=pawnHash=0ULL;
     halfMoveClock=0;
     loadFEN(startingFen);
     initLeaperAttacks();

@@ -18,11 +18,16 @@ class Board{
         std::array<Undo,512> history;
         std::array<Move,512> moveHistory;
         std::array<Bitboard,1024> hashHistory;
+
+        //piece table
         Bitboard pieces[12];
         Bitboard whitePieces;
         Bitboard blackPieces;
         Bitboard occupied;
         Bitboard hash;
+        Bitboard pawnHash;
+
+        //board regularity
         int ply=0;
         int sideToMove;
         int castlingRights;

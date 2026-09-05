@@ -15,7 +15,7 @@ void makeMove(Board &board,Move &move){
     board.moveHistory[board.ply]=move;
     board.hashHistory[board.ply]=board.hash;
     board.history[board.ply++]={board.enPassantSquare,board.whiteKingSquare,
-    board.blackKingSquare,board.castlingRights,board.halfMoveClock,board.hash};
+    board.blackKingSquare,board.castlingRights,board.halfMoveClock,board.hash,board.pawnHash};
     Color color=(Color) board.sideToMove;
     int myColOff=color*6;
     if(board.enPassantSquare!=NO_SQUARE) board.hash ^= randomForEnPassant[board.enPassantSquare%8];
@@ -44,6 +44,13 @@ void makeMove(Board &board,Move &move){
     //update zobrist hash
     board.hash ^= randomForZobrist[piece][from]; //remove from
     board.hash ^= randomForZobrist[piece][to]; //add to
+
+    //pawn hash for eval
+    if(piece==WP || piece==BP){
+        board.pawnHash ^=randomForZobrist[piece][to];//add to
+        board.pawnHash ^=randomForZobrist[piece][from];//remove from
+    }
+
     if(color==WHITE){
         board.whitePieces ^= fromToMask;
     }
@@ -97,6 +104,8 @@ void makeMove(Board &board,Move &move){
 
         board.hash ^= randomForZobrist[piece][to];
         board.hash ^= randomForZobrist[promotionP][to];
+
+        board.pawnHash^=randomForZobrist[piece][to];
     }
     
     //enpassant
@@ -111,6 +120,7 @@ void makeMove(Board &board,Move &move){
         board.occupied ^= (1ULL<<pawnOn);
         board.pieceOn[pawnOn]=NO_PIECE;
         board.hash ^= randomForZobrist[getCapturedPiece(move)][pawnOn];
+        board.pawnHash^= randomForZobrist[getCapturedPiece(move)][pawnOn];
     }
 
     //castling
@@ -184,6 +194,7 @@ void unMakeMove(Board &board){
     board.whiteKingSquare=undo.whiteKingSq;
     board.halfMoveClock=undo.halfMoveClock;
     board.hash=undo.hash;
+    board.pawnHash=undo.pawnHash;
 
     Color color=(Color)( board.sideToMove ^ 1);
     int myColOff=color*6;
