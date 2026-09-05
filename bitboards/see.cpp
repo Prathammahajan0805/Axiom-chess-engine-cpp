@@ -4,15 +4,7 @@
 #include "board.h"
 #include "types.h"
 #include <cmath>
-static constexpr int SEE_VALUE[]{
-    100,
-    320,
-    330,
-    500,
-    900,
-    0,
-    0
-};
+
 Bitboard attackersTo(const Board& board,int square,Bitboard occ){
     Bitboard attackers=0ull;
     attackers |= (pawnAttacks[WHITE][square] & board.pieces[BP]) | (pawnAttacks[BLACK][square] & board.pieces[WP]);

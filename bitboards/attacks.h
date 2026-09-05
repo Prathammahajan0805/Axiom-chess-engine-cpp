@@ -23,6 +23,10 @@ extern Bitboard bishopAttacks[64][512];
 extern Bitboard line[64][64];
 extern Bitboard between[64][64];
 extern Bitboard fileMasks[8];
+constexpr Bitboard rankMasks[8] = {
+    0xFFULL,       0xFF00ULL,       0xFF0000ULL,       0xFF000000ULL,
+    0xFF00000000ULL, 0xFF0000000000ULL, 0xFF000000000000ULL, 0xFF00000000000000ULL
+};
 void initLineBetween();
 void initLeaperAttacks();
 void initBishopReleventOccupancyMask();

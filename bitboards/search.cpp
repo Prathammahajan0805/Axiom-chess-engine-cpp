@@ -21,6 +21,7 @@ constexpr int MIN_HISTORY=-MAX_HISTORY;
 constexpr int MAX_PLY=128;
 std::array<std::array<Move,MAX_PLY>,MAX_PLY> pvTable;
 std:: array<int,MAX_PLY> pvLength;
+std::array<int,MAX_PLY> evalHistory;
 struct searchTHreads{
 
 };
@@ -92,8 +93,8 @@ namespace timeControls{
     int64_t timeLimitMs;
     int64_t optimalTimeMs;
     int64_t softLimitMs;
-    int64_t overheadMs=30; //tune
     bool stopSearch;
+    
 }
 namespace timeManagement {
     int bestMoveStability;
@@ -101,6 +102,8 @@ namespace timeManagement {
     std::array<int,MAX_PLY> scoreHistory;
     uint64_t rootBestMoveNodes=0;
     uint64_t rootTotalNodes=0;
+    int rootBestScore = -INF;
+    int rootSecondBestScore = -INF;
 }
 int correctedStaticEval(const Board& board, int rawEval){
     int corr = Hueristics::pawnCorrHist[board.sideToMove][board.pawnHash & (Hueristics::CORR_HISTORY_LIMIT-1)];
@@ -209,6 +212,9 @@ void initSearch(){
     clearTT();
 
 }
+int captureValue(const Move& move){
+    return SEE_VALUE[getCapturedPiece(move)%6]-SEE_VALUE[getMovedPiece(move)%6];
+}
 int scoreMove(const Move &move,int ply,const Board& board){
     bool isPromotion=getPromotionPiece(move)!=NO_PIECE;
     bool iscapture=isCapture(move);
@@ -241,14 +247,16 @@ int quiescence(Board &board,int alpha,int beta,int ply){
     if(checkTime()) return 0;
     MoveList moveList=isInCheck((Color) board.sideToMove,board)?generateMoves<ALL>(board):generateMoves<CAPTURES>(board);
     bool inCheck=isInCheck((Color) board.sideToMove,board);
+    int standPat=eval(board);
     if(!inCheck){
-        int standPat=eval(board);
+        
         if(standPat>=beta){
             return beta;
         }
         if(standPat>alpha){
             alpha=standPat;
         }
+        
     }
     //get capture only moves
     if(moveList.count==0){
@@ -285,6 +293,9 @@ int quiescence(Board &board,int alpha,int beta,int ply){
         std::swap(moveList.moves[i],moveList.moves[ind]);
         std::swap(scores[i],scores[ind]);
 
+        // delta pruning
+        if(!inCheck && standPat + captureValue(moveList.moves[i]) + 200 < alpha) continue;
+
         //see pruning expensive as hell but works its charm so called once per capture here and for scoring moves at  getCaptureScore
          if (!inCheck && isCapture(moveList.moves[i]) && !seeGE(board, moveList.moves[i], 0))
             continue;
@@ -320,6 +331,8 @@ Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
     else return Move{0};
     //iterative deepening
     for(int depth=1;depth<=maxDepth;depth++){
+        timeManagement::rootBestScore = -INF;
+        timeManagement::rootSecondBestScore = -INF;
         uint64_t nodesAtIterationStart = getNodes();
         Move rootBestMove=bestMove;
         int alphaWindow=25, betaWindow=25;
@@ -385,10 +398,13 @@ Move findBestMove(Board &board, int maxDepth,int64_t timeLimitMs){
         for (int i = 0; i < pvLength[0]; i++)
             std::cout << " " << moveToUci(pvTable[0][i]);
         std::cout << std::endl;
+        bool easyMove= depth>=6 && timeManagement::bestMoveStability>=4 && (timeManagement::rootBestScore - timeManagement::rootSecondBestScore) > 50;
 
         if(elapsedMs >= timeControls::softLimitMs){
             break;
         }
+
+        if(easyMove && elapsedMs >= timeControls::optimalTimeMs*0.3) break;
     }
     std::string output = "bestmove " + moveToUci(bestMove);
     if (pvLength[0] >= 2) {
@@ -406,6 +422,16 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
     alpha = std::max(alpha, -MATE_SCORE + ply);
     beta  = std::min(beta,   MATE_SCORE - ply - 1);
     if(alpha >= beta) return alpha;
+
+    bool isCheck=isInCheck((Color)board.sideToMove,board);
+    
+    //probCuting
+
+    if(depth>=5 && !isPV && !isCheck){ 
+        int pcBeta=beta+20*depth;
+        int s=search(board, depth-4, ply, pcBeta-1, pcBeta,false); 
+        if(s>=pcBeta) return s; 
+    }
 
     //quiescence search check if beyond depth are their any capture that just blunders 
     if(depth==0) return quiescence(board, alpha,  beta, ply);
@@ -427,10 +453,11 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
         int sDepth = (depth-1)/2;
         int sScore = search(board, sDepth, ply, sBeta-1, sBeta, false, ttMove);
         if(sScore < sBeta){
-            extension = 1; // ttMove is singular, extend it
+            extension = 1; // ttMove is singular extend it
         } else if(sBeta >= beta){
-            return sBeta; // multi-cut: even a "worse" move than ttMove beats beta, prune whole node
-        }
+            return sBeta; // multi-cut: even a "worse" move than ttMove beats beta prune whole node
+        }if(sScore>= sBeta) extension -=1;
+        
     }
     //check if any move is there
     if(entry){
@@ -444,21 +471,30 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
     }
 
     
-    bool isCheck=isInCheck((Color)board.sideToMove,board);
     //no tt move so we shave a depth off
     if(!entry && depth>=4 && !isCheck){
         depth -= 1;
     }
-    //reverse futility pruning
+    
     int rawEval = eval(board);
     int staticEval = correctedStaticEval(board, rawEval);
+    evalHistory[ply] = staticEval;
+    // is the position improving
+    bool improving = (ply >= 2 && staticEval > evalHistory[ply-2]);
+    
+    //reverse futility pruning
     if (!isCheck && depth <= 6 && ply != 0 && beta < MATE_SCORE - 1000) {
-        int margin = 120 * depth; // tune this
+        int baseMargin = 120 * depth; // tune this
+        int margin=baseMargin-(improving?0:30);
         if (staticEval - margin >= beta)
             return staticEval - margin;
     }
 
-    
+    //razoring- at very low depth  with a static  eval well below alpha send straight to quiescence
+    if(!isCheck && depth<=3 && staticEval+depth*120<alpha ){
+        int qScore=quiescence(board,alpha,beta,ply);
+        if(qScore<alpha) return qScore;
+    }
 
 
     //generate moves
@@ -494,6 +530,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
     int newDepth = depth-1 + (isCheck ? 1 : 0);
     int origAlpha=alpha;
 
+
     for(int i=0;i<moveList.count;i++){
         int maxScoreMove=scores[i],ind=i;
 
@@ -506,6 +543,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
         }
         std::swap(moveList.moves[i],moveList.moves[ind]);
         std::swap(scores[i],scores[ind]);
+
         Move &move=moveList.moves[i];
         if(excludedMove.moveInfo && move.moveInfo==excludedMove.moveInfo) continue;
         int thisNewDepth = newDepth + (move.moveInfo==ttMove.moveInfo ? extension : 0);
@@ -517,11 +555,13 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
         //forward futiliy pruning bassically saying that the current position is so bad not even a good move can save me from this mess let alone a quiet one
         if(!isPV && !isCheck && depth<=8 && getCapturedPiece(move)==NO_PIECE && getPromotionPiece(move)==NO_PIECE && bestScore>-MATE_SCORE+1000){
             int futilityMargin = 100 + 90*depth; // tune
+            futilityMargin-= (improving?0:30);//tune
             if(staticEval + futilityMargin <= alpha) continue;
         }
         //see pruning nice right 
         if(!isPV && depth<=8 && bestScore>-MATE_SCORE+1000){
             int seeMargin = isCapture(move) ? -20*depth*depth : -50*depth; // tune both
+            seeMargin-=improving?0:30;
             if(!seeGE(board, move, seeMargin)) continue;
         }
         //store move stack for continuation history
@@ -535,6 +575,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
             score=-search(board, thisNewDepth,ply+1,-beta,-alpha,isPV);
         }else{
             bool neededScan=true;
+
             //LMR
             // so what lmr basicaly does is that it checks if the current move at lower depth atleast beats alhpa if it does only then full depth scan is needed else just skip that shit and move on
             bool givesCheck = isInCheck((Color)board.sideToMove, board); //sideToMove is now the opponent as toggled by make move
@@ -543,6 +584,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
                 int histScore = Hueristics::historyHeuristic[board.sideToMove][getFrom(move)][getTo(move)];
                 red -= histScore / 8192;
                 red = std::clamp(red, 0, newDepth);
+                if(!improving) red+=1;
                 int reducedDepth=std::max(thisNewDepth-red,0);
 
                 score=-search(board, reducedDepth,ply+1,-alpha-1,-alpha,false);
@@ -560,6 +602,14 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
         unMakeMove(board);
         if(ply==0 && score > bestScore){
             timeManagement::rootBestMoveNodes = nodes - nodesBeforeThisMove;
+        }
+        if(ply == 0){
+            if(score > timeManagement::rootBestScore){
+                timeManagement::rootSecondBestScore = timeManagement::rootBestScore;
+                timeManagement::rootBestScore = score;
+            } else if(score > timeManagement::rootSecondBestScore){
+                timeManagement::rootSecondBestScore = score;
+            }
         }
         // just time control stuff
         if(timeControls::stopSearch) return 0;
@@ -585,7 +635,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
                 Hueristics::historyHeuristic[board.sideToMove][from][to]+=bonus-(Hueristics::historyHeuristic[board.sideToMove][from][to]*std::abs(bonus)/MAX_HISTORY);
                 if(ply>0){
                     auto [prevPiece, prevTo] = Hueristics::moveStack[ply-1];
-                    auto &ch = Hueristics::contHistory[prevPiece][prevTo][getMovedPiece(move)][to];
+                    auto &ch = Hueristics::contHistory[prevPiece][prevTo][getMovedPiece(move)%6][to];
                     ch += bonus - (ch*std::abs(bonus)/MAX_HISTORY);
                 }
             }
@@ -619,7 +669,7 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
                     h += malus - (h * std::abs(malus) / MAX_HISTORY);
                     if(ply>0){
                         auto [prevPiece, prevTo] = Hueristics::moveStack[ply-1];
-                        auto &ch = Hueristics::contHistory[prevPiece][prevTo][getMovedPiece(move)][to];
+                        auto &ch = Hueristics::contHistory[prevPiece][prevTo][getMovedPiece(prev)%6][to];
                         ch += malus - (ch * std::abs(malus) / MAX_HISTORY);
                     }
                 }
@@ -640,7 +690,9 @@ int search(Board &board,int depth,int ply,int alpha,int beta,bool isPV, Move exc
         if(!isCheck && getPromotionPiece(bestMove)==NO_PIECE)
         updateCorrHist(board, depth, bestScore, staticEval);
         //store in ttentry
-        store(board.hash, bestMove,  depth, scoreToTT(bestScore, ply), flag);
+        if(!excludedMove.moveInfo){
+            store(board.hash, bestMove,  depth, scoreToTT(bestScore, ply), flag);
+        }
     
     return bestScore;
 }
