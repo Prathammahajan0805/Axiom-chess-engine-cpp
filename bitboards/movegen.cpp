@@ -3,7 +3,7 @@
 #include"movegen.h"
 #include "attacks.h"
 #include "bitboards.h"
-#include "board.h"
+#include "board.hpp"
 #include "makeMove.h"
 #include "moves.h"
 #include "types.h"
@@ -123,39 +123,43 @@ void generatePawnMoves(MoveList &createMove, const Board &board, Color color, ch
             : (single & RANK_6)>>8) & ~(board.occupied);
 
     single &= info.checkMask;
+    dblPush &=info.checkMask;
     Bitboard promotionRank = (color == WHITE) ? RANK_8 : RANK_1;
     Bitboard promotion = single & promotionRank;
     single &= ~promotionRank;
-    dblPush &=info.checkMask;
     if constexpr (Type==ALL || Type==QUITE){
-
-    while(single){
-        int to=popLSB(single);
-        int from= color==WHITE? to-8:to+8;
-        if((pinAllows(from,info, to))){
-            createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset);
+        
+        while(single){
+            int to=popLSB(single);
+            int from= color==WHITE? to-8:to+8;
+            if((pinAllows(from,info, to))){
+                createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset);
+            }
         }
-    }
-    while(dblPush){
-        int to=popLSB(dblPush);
-        int from= color==WHITE? to-16:to+16;
-        if((pinAllows(from,info, to))){
-            createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset,NO_PIECE,NO_PIECE,false,true);
+        while(dblPush){
+            int to=popLSB(dblPush);
+            int from= color==WHITE? to-16:to+16;
+            if((pinAllows(from,info, to))){
+                createMove.moves[createMove.count++]=addMove(from, to,WP+myColOffset,NO_PIECE,NO_PIECE,false,true);
+            }
         }
-    }
-    while(promotion){
-        int to=popLSB(promotion);
-        int from=color==WHITE?to-8:to+8;
-        if (pinAllows(from,info,to)) {
-        for(int i=WN+myColOffset;i<=WQ+myColOffset;i++){
-            createMove.moves[createMove.count++]=addMove(from, to, WP+myColOffset,NO_PIECE,i);
+        while(promotion){
+            int to=popLSB(promotion);
+            int from=color==WHITE?to-8:to+8;
+            if (pinAllows(from,info,to)) {
+                for(int i=WN+myColOffset;i<=WQ+myColOffset;i++){
+                    createMove.moves[createMove.count++]=addMove(from, to, WP+myColOffset,NO_PIECE,i);
+                }
+            }
         }
-        }   
-    }
+        
     }
     if constexpr (Type==ALL||Type== CAPTURES){
+        
+        Bitboard pawns=board.pieces[WP+myColOffset];
+        
     //capturing moves
-    Bitboard pawns=board.pieces[WP+myColOffset];
+    
     
     while(pawns){
         Bitboard enpassants=0ULL;
@@ -402,7 +406,7 @@ bool isInCheck(Color color,const Board& board){
 }
 bool hasNonePawnPieces(const Board &board){
     int offset=board.sideToMove==WHITE?0:6;
-    return (board.pieces[WR+offset] | board.pieces[WR+offset] | board.pieces[WN+offset] | board.pieces[WB+offset])!=0;
+    return (board.pieces[WQ+offset] | board.pieces[WR+offset] | board.pieces[WN+offset] | board.pieces[WB+offset])!=0;
 }
 template MoveList generateMoves<ALL>(const Board&);
 template MoveList generateMoves<CAPTURES>(const Board&);

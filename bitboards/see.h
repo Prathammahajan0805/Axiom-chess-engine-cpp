@@ -1,7 +1,7 @@
 // see.h
 #pragma once
 #include "types.h"
-#include "board.h"
+#include "board.hpp"
 static constexpr int SEE_VALUE[]{
     100,
     320,

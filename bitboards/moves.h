@@ -17,7 +17,7 @@ struct Move{
     static constexpr uint32_t isEnPassantMask=1u<<26;
     static constexpr uint32_t isCastlingMask=1u<<27;
 };
-#include "board.h"
+#include "board.hpp"
 inline Move addMove(uint32_t from,
     uint32_t to,
     uint32_t movedPiece,

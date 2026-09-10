@@ -1,6 +1,6 @@
 #include "makeMove.h"
 #include "bitboards.h"
-#include "board.h"
+#include "board.hpp"
 #include "moves.h"
 #include "types.h"
 #include "zobrist.h"
@@ -226,6 +226,9 @@ void unMakeMove(Board &board){
         }
         board.occupied ^= (1ULL<<to);
         board.pieceOn[to]=(Piece) getCapturedPiece(move);
+        if(getCapturedPiece(move)==WP || getCapturedPiece(move)==BP){
+            board.pawnHash ^= randomForZobrist[getCapturedPiece(move)][to];
+        }
     }
 
     //promotion
@@ -277,7 +280,9 @@ void unMakeMove(Board &board){
 void makeNullMove(Board &board){
     // In makeNullMove()
     assert(board.ply >= 0 && board.ply < 512 && "makeNullMove: ply out of bounds");
-    Undo& undo=board.history[board.ply++];
+    Undo& undo=board.history[board.ply];
+    board.moveHistory[board.ply] = Move{0};      
+    board.hashHistory[board.ply++] = board.hash;
     undo.hash=board.hash;
     undo.enPassantSq=board.enPassantSquare;
     if(board.enPassantSquare!=NO_SQUARE){

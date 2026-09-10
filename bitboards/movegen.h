@@ -2,7 +2,7 @@
 #include<iostream>
 #include<vector>
 #include "bitboards.h"
-#include "board.h"
+#include "board.hpp"
 #include "moves.h"
 #include "attacks.h"
 #include "types.h"

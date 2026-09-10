@@ -1,7 +1,7 @@
 #include"see.h"
 #include "attacks.h"
 #include "bitboards.h"
-#include "board.h"
+#include "board.hpp"
 #include "types.h"
 #include <cmath>
 

@@ -1,4 +1,4 @@
-#include"board.h"
+#include"board.hpp"
 #include "attacks.h"
 #include"bitboards.h"
 #include "search.h"
@@ -21,7 +21,7 @@ int charToPiece(char c){
     }
     return 0;
 }
-
+const std::string Board::startingFen ="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 void Board::clearBoard() {
     for (int i = 0; i < 12; i++)
@@ -30,6 +30,7 @@ void Board::clearBoard() {
     whitePieces = 0ULL;
     blackPieces = 0ULL;
     occupied = 0ULL;
+    halfMoveClock=0;
 
     sideToMove = WHITE;
     castlingRights = 0;
@@ -37,6 +38,9 @@ void Board::clearBoard() {
     hash=pawnHash=0ULL;
     whiteKingSquare = NO_SQUARE;
     blackKingSquare = NO_SQUARE;
+    hashHistory.fill(0);
+    moveHistory.fill({});
+    history.fill({});
     ply=0;
 }
 void Board::loadFEN(const string& fen) {
@@ -119,6 +123,10 @@ void Board::loadFEN(const string& fen) {
             enPassantSquare = getSquare(epfile, eprank);
             hash^=randomForEnPassant[epfile];
         }
+        if(!(ss >> halfmove)) halfmove = 0;
+        if(!(ss >> fullmove)) fullmove = 1;
+        if(halfmove < 0) halfmove = 0;
+        halfMoveClock = halfmove;
         updateOccupancies();
         
 }
@@ -183,6 +191,7 @@ Board::Board(){
     pieceOn.fill(NO_PIECE);
     hash=pawnHash=0ULL;
     halfMoveClock=0;
+    
     loadFEN(startingFen);
     initLeaperAttacks();
     initLineBetween();

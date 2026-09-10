@@ -1,6 +1,6 @@
 #pragma once
 #include<iostream>
-#include"board.h"
+#include"board.hpp"
 struct GoParams {
     int depth       = 0;
     int64_t movetime = -1;

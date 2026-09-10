@@ -1,5 +1,5 @@
 # pragma once
-#include "board.h"
+#include "board.hpp"
 #include<iostream>
 struct PawnEntry {
     uint64_t key = 0;
@@ -56,6 +56,8 @@ constexpr std::array<std::array<int,28>,6> eg_mobility = {{
     {0},
 
     // WN (0..8)
+    {-30,-20,-10,0,8,14,18,22,26},
+    //wb
     { -30, -18,  -6,  4, 10, 16, 21, 25, 29, 32, 35, 37, 38, 39 },
 
     // WR (0..14)
@@ -206,4 +208,4 @@ constexpr int endgameKing_table[64] = {
 constexpr int MATE_SCORE = 30000;
 constexpr int DRAW_SCORE = 0;
 void initEval();
-int eval(const Board& board);
+int eval(const Board& board, PawnHashTable &pht);

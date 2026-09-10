@@ -1,4 +1,4 @@
 #pragma once
 #include<iostream>
-#include"board.h"
+#include"board.hpp"
 void bench(Board& board);

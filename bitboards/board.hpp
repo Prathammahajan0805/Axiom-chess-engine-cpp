@@ -10,8 +10,8 @@
 
 class Board{
     private:
-        void clearBoard();
-        std::string const startingFen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    static const std::string  startingFen;
+    void clearBoard();
         
     public:
         std::array<Piece,64> pieceOn;
@@ -26,7 +26,8 @@ class Board{
         Bitboard occupied;
         Bitboard hash;
         Bitboard pawnHash;
-
+        
+        
         //board regularity
         int ply=0;
         int sideToMove;
@@ -35,8 +36,13 @@ class Board{
         int whiteKingSquare;
         int blackKingSquare;
         int halfMoveClock;
-
+        
         Board();
+        Board(const Board&)            = default;
+        Board(Board&&)                 = default;
+        Board& operator=(const Board&) = default;
+        Board& operator=(Board&&)      = default;
+        ~Board()                       = default;
 
         inline void updateOccupancies(){
             whitePieces =

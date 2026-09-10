@@ -2,7 +2,7 @@
 #include <cstdint>
 #include<iostream>
 #include"bitboards.h"
-#include "board.h"
+#include "board.hpp"
 #include "magic.h"
 #include <cstring>
 

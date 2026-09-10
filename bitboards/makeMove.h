@@ -4,7 +4,7 @@
 #include "movegen.h"
 #include"moves.h"
 #include "bitboards.h"
-#include "board.h"
+#include "board.hpp"
 
 
 inline bool pinAllows(int pinnedSq,const checkInfo &info,int to){

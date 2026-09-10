@@ -1,4 +1,4 @@
-#include "board.h"
+#include "board.hpp"
 #include"perft.h"
 #include <cstdint>
 #include<chrono>

@@ -1,6 +1,6 @@
 #include "attacks.h"
 #include "bitboards.h"
-#include "board.h"
+#include "board.hpp"
 #include "magic.h"
 #include "types.h"
 #include <cstdint>
