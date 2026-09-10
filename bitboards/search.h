@@ -20,6 +20,7 @@ struct SharedState {
     std::atomic<int64_t> softLimitMs{0};
     std::mutex outputMutex;
     std::atomic<bool> stopFlag{false};
+    std::atomic<bool> isPondering{false};
 };
 
 struct SearchThread {

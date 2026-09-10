@@ -203,7 +203,7 @@ int scoreMove(SearchThread &ctx, const Move &move, int ply, const Board &board) 
 bool checkTime(SearchThread &ctx, SharedState &shared) {
     if ((ctx.nodes & 2047) != 0) return shared.stopSearch.load(std::memory_order_relaxed);
 
-    if (ctx.id == 0) {
+    if (ctx.id == 0 && !shared.isPondering.load(std::memory_order_relaxed)) {
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - shared.startTime).count();
         if (elapsed >= shared.timeLimitMs) {

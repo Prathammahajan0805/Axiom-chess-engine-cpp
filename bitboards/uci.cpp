@@ -14,10 +14,8 @@
 #include <vector>
 #include <atomic>
 
-
-
 static const std::string STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
+bool ponder=false;
 GoParams p;
 
 // ===== multithreading state =====
@@ -173,6 +171,7 @@ GoParams parseGo(const std::vector<std::string>& tokens) {
         else if (tokens[i] == "binc" && i + 1 < tokens.size())p.binc = stoll(tokens[++i]);
         else if (tokens[i] == "movestogo" && i + 1 < tokens.size())p.movestogo= stoi(tokens[++i]);
         else if (tokens[i] == "infinite") p.infinite = true;
+        else if (tokens[i] == "ponder") ponder=true;
     }
     return p;
 }
@@ -244,6 +243,7 @@ void initUCI(){
             cout << "id author Pratham Mahajan\n";
             cout << "option name Threads type spin default 1 min 1 max 256\n";
             cout << "option name Hash type spin default 16 min 1 max 4096\n";
+            cout << "option name Ponder type check default false\n";
             cout << "uciok"<<endl;
         }
         else if(cmd=="isready"){
@@ -265,6 +265,7 @@ void initUCI(){
             int depth;
             int64_t timeMs;
             computeSearchBudget(p,Color(board.sideToMove), depth, timeMs);
+            shared.isPondering.store(ponder);
             launchSearch(depth, timeMs, board);
         }
         else if(cmd=="setoption"){
@@ -278,6 +279,8 @@ void initUCI(){
             shared.stopFlag.store(true);
             joinSearch();
             break;
+        }else if(cmd=="ponderhit"){
+            shared.isPondering.store(false);
         }
     }
 }

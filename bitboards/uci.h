@@ -8,6 +8,7 @@ struct GoParams {
     int movestogo   = -1;
     bool infinite   = false;
 };
+extern bool ponder;
 extern GoParams p;
 std::string moveToUci(const Move& move);
 void initUCI();
