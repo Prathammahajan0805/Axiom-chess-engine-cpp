@@ -93,7 +93,7 @@ void clearKillers(SearchThread &ctx) {
 }
 
 void initSearchThread(SearchThread &ctx, const Board &board) {
-    ctx.board = board; // deep copy - Board is a value type, see board.h
+    ctx.board = board; // deep copy Board is a value type, see board.h
     ctx.pht = PawnHashTable{}; // fresh per-thread pawn hash table for this search
 
     ctx.historyHeuristic = {};

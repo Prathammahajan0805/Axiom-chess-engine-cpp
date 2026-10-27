@@ -45,23 +45,21 @@ std::string moveToUci(const Move& move) {
     return s;
 }
 
-// ===== joinSearch now joins the dispatcher, which transitively joins all workers =====
+// join all worker threads to main
 void joinSearch(){
     if(dispatcherThread.joinable()) dispatcherThread.join();
 }
 
-// ===== launchSearch: fans out to numThreads workers, prints bestmove when done =====
+// launch worker threads if any + main thread
 void launchSearch(int depth, uint64_t timeMs, Board& board){
     joinSearch();
-
     shared.stopFlag.store(false);
+    shared.stopSearch.store(false);
     shared.startTime = std::chrono::steady_clock::now();
     shared.timeLimitMs = timeMs;
     shared.optimalTimeMs = timeMs;
     shared.softLimitMs.store((int64_t)timeMs);
 
-    // snapshot the board synchronously on THIS thread before any worker starts,
-    // so no worker ever touches the UCI thread's live `board` object
     Board boardSnapshot = board;
     int depthCopy = depth;
 
@@ -178,7 +176,7 @@ GoParams parseGo(const std::vector<std::string>& tokens) {
 
 //position [fen <fenstring>] [startpos] moves <move1>...<moven>
 void applyPositionCommand(const vector<string>& tokens, Board& board){
-    uint8_t ind=1;
+    size_t ind=1;
     if(ind>tokens.size()) return;
     if(tokens[ind]=="startpos"){
         board.loadFEN(STARTPOS_FEN);
@@ -257,6 +255,7 @@ void initUCI(){
             threadContexts.clear();
         }else if(cmd=="position"){
             shared.stopFlag.store(true);
+            shared.stopSearch.store(true);
             joinSearch();
             applyPositionCommand(tokens,board);
         }else if(cmd=="go"){
@@ -272,6 +271,7 @@ void initUCI(){
             applySetOption(tokens);
         }
         else if(cmd=="stop"){
+            shared.stopSearch.store(true);
             shared.stopFlag.store(true);
             joinSearch();
         }
