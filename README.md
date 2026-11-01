@@ -1,4 +1,4 @@
-# C++ Chess Engine
+# AXIOM C++ Chess Engine
 
 A **UCI-compatible chess engine written in C++17**, built around a bitboard board representation, magic-bitboard sliding-piece attacks, fully legal move generation, a modern alpha-beta search (PVS with a long list of pruning and reduction heuristics), a tapered hand-crafted evaluation, a transposition table, Lazy-SMP-style multithreading, and tournament-style time management.
 
