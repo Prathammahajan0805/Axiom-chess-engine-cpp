@@ -3,9 +3,9 @@
 #include <cstdint>
 #include<chrono>
 using namespace std;
-void bench(Board& board){
+void bench(Board& board,int depth){
     auto start = std::chrono::high_resolution_clock::now();
-    uint64_t nodes=perftRoot(board, 7);
+    uint64_t nodes=perftRoot(board, depth);
     auto end = std::chrono::high_resolution_clock::now();
     double seconds = std::chrono::duration<double>(end - start).count();
     double nps = seconds > 0.0 ? (double)nodes / seconds : 0.0;

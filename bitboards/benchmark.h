@@ -1,4 +1,4 @@
 #pragma once
 #include<iostream>
 #include"board.hpp"
-void bench(Board& board);
+void bench(Board& board,int depth);

@@ -574,17 +574,15 @@ The tool prints the two arrays to standard output; paste them into `magic_nums.h
 
 These come from reading the code and testing the build; they are listed so you know what to expect and what to improve next.
 
-1. **Bishop-colour bug in the insufficient-material check.** `isInsufficientMaterial()` (in `search.cpp`) decides whether two lone bishops are on the same colour with `square % 2`, which is the *file* parity, not the square colour (it should use `(rank + file) % 2`). As a result, K+B vs K+B with **opposite-coloured** bishops can be wrongly scored as a dead draw, and if it happens at the root the engine prints `bestmove 0000` (verified with `position fen 4k3/8/8/8/8/8/b7/B3K3 w - - 0 1`). *Suggested fix:* compare `((sq / 8) + (sq % 8)) % 2` for each bishop.
-2. **Transposition table is off until `Hash` is set.** `resizeTT()` is only called from `setoption name Hash`; until then `probe`/`store` do nothing, and search quality and speed change noticeably. Always set `Hash` (most GUIs do this when you configure the option). *Suggested fix:* call `resizeTT(16)` once at start-up in `initSearch()`.
-3. **`id name` is empty.** The `uci` reply prints `id name ` with no engine name. Some GUIs and match tools need a non-empty name to identify the engine.
-4. **Unsupported `go` parameters:** `nodes`, `mate`, `searchmoves`. Unsupported UCI commands: `debug`, `register`, and no `d`/`perft`/`bench` helpers. The `Ponder` check option is declared but `setoption` does not parse it (pondering is driven by `go ponder`).
-5. **Pondering is basic.** The per-iteration soft-limit/easy-move checks in `threadLoop` are not gated on `isPondering`, so a ponder search can stop on its own before `ponderhit`/`stop`; and the `ponder` flag parsed from `go` is never reset to `false` afterwards. Treat pondering as experimental.
-6. **Shared transposition table without synchronisation.** With `Threads > 1`, threads read and write `TTEntry` records without atomics or locks (a common Lazy-SMP trade-off, but a data race in the C++ sense and a possible source of rare torn entries).
-7. **Quit cleanly.** If standard input is closed while a search thread is still running (for example piping commands without a final `quit`), the process aborts with `terminate called without an active exception`. Always finish a scripted session with `quit` (after the search has had time to finish, or after `stop`).
-8. **Initial board hash.** The `Board` constructor loads the start position before the Zobrist keys are initialised, so the very first (pre-`position`) hash is not meaningful. `position` and `ucinewgame` reload the board and compute correct hashes, so GUIs are unaffected. Send `position` (or `ucinewgame`) before `go`.
-9. **Platform:** `main.cpp` includes `<windows.h>` and the code uses GCC/Clang builtins, so the supported toolchain is GCC (or Clang) on any OS after removing the `windows.h` include.
-10. **Limits:** games are limited to 511 plies by the history arrays; search depth is capped at 64 for `infinite`/`movetime`; maximum search ply is 128.
-11. **Not implemented (yet):** opening book, endgame tablebases, NNUE, `MultiPV`, `UCI_Chess960`, `go searchmoves`.
+
+1. **Unsupported `go` parameters:** `nodes`, `mate`, `searchmoves`. Unsupported UCI commands: `debug`, `register`, and no `d`/`perft`/`bench` helpers. The `Ponder` check option is declared but `setoption` does not parse it (pondering is driven by `go ponder`).
+2. **Pondering is basic.** The per-iteration soft-limit/easy-move checks in `threadLoop` are not gated on `isPondering`, so a ponder search can stop on its own before `ponderhit`/`stop`; and the `ponder` flag parsed from `go` is never reset to `false` afterwards. Treat pondering as experimental.
+3. **Shared transposition table without synchronisation.** With `Threads > 1`, threads read and write `TTEntry` records without atomics or locks (a common Lazy-SMP trade-off, but a data race in the C++ sense and a possible source of rare torn entries).
+4. **Quit cleanly.** If standard input is closed while a search thread is still running (for example piping commands without a final `quit`), the process aborts with `terminate called without an active exception`. Always finish a scripted session with `quit` (after the search has had time to finish, or after `stop`).
+5. **Initial board hash.** The `Board` constructor loads the start position before the Zobrist keys are initialised, so the very first (pre-`position`) hash is not meaningful. `position` and `ucinewgame` reload the board and compute correct hashes, so GUIs are unaffected. Send `position` (or `ucinewgame`) before `go`.
+6. **Platform:** `main.cpp` includes `<windows.h>` and the code uses GCC/Clang builtins, so the supported toolchain is GCC (or Clang) on any OS after removing the `windows.h` include.
+7. **Limits:** games are limited to 511 plies by the history arrays; search depth is capped at 64 for `infinite`/`movetime`; maximum search ply is 128.
+8. **Not implemented (yet):** opening book, endgame tablebases, NNUE, `MultiPV`, `UCI_Chess960`, `go searchmoves`.
 
 ---
 

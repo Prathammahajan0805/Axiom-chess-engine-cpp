@@ -33,7 +33,7 @@ bool isInsufficientMaterial(const Board &board) {
         board.pieces[WQ] | board.pieces[BQ]) {
         return false;
     }
-
+    auto squareColor = [](int sq) { return ((sq / 8) + (sq % 8)) & 1; };
     int whiteKnights = popCount(board.pieces[WN]);
     int blackKnights = popCount(board.pieces[BN]);
     int whiteBishops = popCount(board.pieces[WB]);
@@ -47,7 +47,8 @@ bool isInsufficientMaterial(const Board &board) {
     if (totalMinors == 2 && whiteBishops == 1 && blackBishops == 1) {
         int wb = bitScan(board.pieces[WB]);
         int bb = bitScan(board.pieces[BB]);
-        return (wb % 2) == (bb % 2);
+        
+        return squareColor(wb) == squareColor(bb);
     }
 
     return false;

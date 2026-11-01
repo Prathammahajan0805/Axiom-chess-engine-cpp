@@ -2,9 +2,11 @@
 #include "TT.h"
 #include "board.hpp"
 #include "movegen.h"
+#include "perft.h"
 #include "search.h"
 #include"moves.h"
 #include"makeMove.h"
+#include"benchmark.h"
 
 #include "types.h"
 #include <sstream>
@@ -125,7 +127,11 @@ Move uciToMove(const std::string& moveStr, Board& board) {
 static constexpr int MAX_SEARCH_DEPTH = 64;
 static constexpr int64_t HUGE_TIME_MS = 1LL << 40;
 
-void computeSearchBudget(const GoParams& p, Color side, int& depthOut, int64_t& timeMsOut) {
+void computeSearchBudget(const GoParams& p, Color side, int& depthOut, int64_t& timeMsOut,Board& board) {
+    if(p.perft){
+        perftRoot(board, p.depth);
+        return;
+    }
     if (p.infinite) {
         depthOut = MAX_SEARCH_DEPTH;
         timeMsOut = HUGE_TIME_MS;
@@ -170,6 +176,7 @@ GoParams parseGo(const std::vector<std::string>& tokens) {
         else if (tokens[i] == "movestogo" && i + 1 < tokens.size())p.movestogo= stoi(tokens[++i]);
         else if (tokens[i] == "infinite") p.infinite = true;
         else if (tokens[i] == "ponder") ponder=true;
+        else if( tokens[i] == "perft" && i+1<tokens.size()) {p.depth=stoi(tokens[i+1]); p.perft=true; i++;}
     }
     return p;
 }
@@ -232,6 +239,7 @@ void applySetOption(const vector<string>& tokens){
 void initUCI(){
     Board board;
     string line;
+    resizeTT(16);
     while(getline(cin,line)){
         vector<string> tokens=splitTokens(line);
         if(tokens.empty()) continue;
@@ -263,7 +271,7 @@ void initUCI(){
             p=parseGo(tokens);
             int depth;
             int64_t timeMs;
-            computeSearchBudget(p,Color(board.sideToMove), depth, timeMs);
+            computeSearchBudget(p,Color(board.sideToMove), depth, timeMs,board);
             shared.isPondering.store(ponder);
             launchSearch(depth, timeMs, board);
         }
@@ -281,6 +289,13 @@ void initUCI(){
             break;
         }else if(cmd=="ponderhit"){
             shared.isPondering.store(false);
+        }
+        else if(cmd=="bench"){
+            int benchDepth=7;
+            if(1<tokens.size()){
+                benchDepth=stoi(tokens[1]);
+            }
+            bench(board,benchDepth);
         }
     }
 }
