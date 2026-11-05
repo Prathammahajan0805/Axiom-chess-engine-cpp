@@ -575,7 +575,7 @@ The tool prints the two arrays to standard output; paste them into `magic_nums.h
 These come from reading the code and testing the build; they are listed so you know what to expect and what to improve next.
 
 
-1. **Unsupported `go` parameters:** `nodes`, `mate`, `searchmoves`. Unsupported UCI commands: `debug`, `register`, and no `d`/`perft`/`bench` helpers. The `Ponder` check option is declared but `setoption` does not parse it (pondering is driven by `go ponder`).
+1. **Unsupported `go` parameters:** `nodes`, `mate`, `searchmoves`. Unsupported UCI commands: `debug`, `register`, and no `d`/`perft`/`bench` helpers.
 2. **Pondering is basic.** The per-iteration soft-limit/easy-move checks in `threadLoop` are not gated on `isPondering`, so a ponder search can stop on its own before `ponderhit`/`stop`; and the `ponder` flag parsed from `go` is never reset to `false` afterwards. Treat pondering as experimental.
 3. **Shared transposition table without synchronisation.** With `Threads > 1`, threads read and write `TTEntry` records without atomics or locks (a common Lazy-SMP trade-off, but a data race in the C++ sense and a possible source of rare torn entries).
 4. **Quit cleanly.** If standard input is closed while a search thread is still running (for example piping commands without a final `quit`), the process aborts with `terminate called without an active exception`. Always finish a scripted session with `quit` (after the search has had time to finish, or after `stop`).
@@ -608,6 +608,6 @@ These come from reading the code and testing the build; they are listed so you k
 
 Engine and code by **Pratham Mahajan**.
 
-The repository does not currently include a license file. If you plan to share or accept contributions, add one (MIT, GPL-3.0, etc.) so others know how they may use the code.
+The repository does not currently include a license file.
 
 Contributions, bug reports and reproducible test positions are welcome.
